@@ -41,7 +41,7 @@ registerConverter({
   id: 'flatten',
   title: 'Flatten JSON',
   shortTitle: 'Flatten',
-  hint: '{"a":{"b":2}} → {"a.b":2}',
+  hint: '{a:{b}} → {a.b}',
   run(sourceText: string): string {
     const { separator, indent } = readSettings();
     const parsed = parseJson(sourceText);
@@ -58,7 +58,7 @@ registerConverter({
   id: 'unflatten',
   title: 'Unflatten (Nest) JSON',
   shortTitle: 'Nest',
-  hint: '{"a.b":2} → {"a":{"b":2}}',
+  hint: '{a.b} → {a:{b}}',
   run(sourceText: string): string {
     const { separator, indent } = readSettings();
     const parsed = parseJson(sourceText);

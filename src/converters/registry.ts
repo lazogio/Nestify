@@ -19,7 +19,9 @@ export interface Converter {
   /**
    * Optional summary of the transform, shown next to the title in the Activity
    * Bar view and in the quick pick. Both sides of the change on one line reads
-   * faster than stacking them, so keep it to roughly 25 characters.
+   * faster than stacking them, so sketch the shape rather than spelling out
+   * real JSON: a narrow side bar truncates the tail, which is the half that
+   * says what you get.
    */
   readonly hint?: string;
   /** Transforms the source text, or throws an Error explaining why it cannot. */
