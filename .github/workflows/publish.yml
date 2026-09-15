@@ -42,6 +42,21 @@ jobs:
       - name: Compile
         run: npm run compile
 
+      - name: Require a changelog entry for the version being released
+        run: |
+          current=$(node -p "require('./package.json').version")
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            target=$(npx --yes semver -i "${{ inputs.bump }}" "$current")
+          else
+            target="$current"
+          fi
+          echo "Looking for the $target section in CHANGELOG.md"
+          escaped=$(printf '%s' "$target" | sed 's/\./\\./g')
+          if ! grep -Eq "^##[[:space:]]+\\[?${escaped}\\]?" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [$target]' section. Add one, then run this workflow again."
+            exit 1
+          fi
+
       - name: Identify the commit author
         if: github.event_name == 'workflow_dispatch'
         run: |
