@@ -14,6 +14,13 @@ All notable changes to Nestify are documented in this file.
   roomier before/after in the tooltip.
 - A live top row in the view describing what a conversion would act on: the file
   or selection, its key count and nesting depth, or why it cannot be converted.
+
+### Fixed
+
+- Running a converter from the Activity Bar no longer reports "open a file first"
+  when the view has focus.
+- An empty object or array no longer counts as a level of nesting, so a flat file
+  with an `[]` in it reads as flat.
 - Optional `hint` on a converter: a few words describing the transform, shown beside
   the title in the view and in `Nestify: Convert With…`.
 

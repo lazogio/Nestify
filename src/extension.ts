@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { targetEditor, trackActiveEditor } from './activeEditor';
 import { Converter, getConverter, listConverters, requireConverter } from './converters/registry';
 import { ConverterTreeProvider } from './converterTreeView';
 
@@ -18,6 +19,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('nestify.runConverter', (target: string | Converter) =>
       runConverter(target)
     ),
+    trackActiveEditor(),
     vscode.window.registerTreeDataProvider('nestify.converters', converterTree),
     // Keep the view's top row honest about what a conversion would act on.
     vscode.window.onDidChangeActiveTextEditor(() => converterTree.refresh()),
@@ -91,7 +93,7 @@ async function pickAndApplyConverter(): Promise<void> {
 }
 
 async function applyConverter(converter: Converter): Promise<void> {
-  const editor = vscode.window.activeTextEditor;
+  const editor = targetEditor();
 
   if (!editor) {
     vscode.window.showErrorMessage('Nestify: open a file first.');

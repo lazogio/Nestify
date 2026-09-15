@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { targetEditor } from './activeEditor';
 import { flattenJson } from './jsonNesting';
 
 /** What the view says about the text a conversion would run on. */
@@ -22,7 +23,7 @@ const MAX_ANALYSED_CHARS = 500_000;
  * so the view cannot claim something the commands would not do.
  */
 export function summariseActiveJson(): ActiveJsonSummary {
-  const editor = vscode.window.activeTextEditor;
+  const editor = targetEditor();
 
   if (!editor) {
     return {
@@ -72,7 +73,13 @@ function describeShape(parsed: object): string {
   return depth <= 1 ? `${keys} · flat` : `${keys} · ${depth} levels deep`;
 }
 
-/** 1 for a flat object, 2 once a value is itself an object, and so on. */
+/**
+ * 1 for a flat object, 2 once a value is itself a populated object, and so on.
+ *
+ * An empty object or array counts as a leaf, not a level, because that is how
+ * `flattenJson` treats it. Counting it as a level made a visibly flat file
+ * report "2 levels deep" over a single `[]`.
+ */
 function depthOf(value: unknown): number {
   if (typeof value !== 'object' || value === null) {
     return 0;
@@ -81,7 +88,7 @@ function depthOf(value: unknown): number {
   const children = Object.values(value as Record<string, unknown>);
 
   if (children.length === 0) {
-    return 1;
+    return 0;
   }
 
   return 1 + Math.max(0, ...children.map(depthOf));
