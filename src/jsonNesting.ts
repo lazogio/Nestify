@@ -41,6 +41,10 @@ function isContainer(value: unknown): value is Record<string, unknown> | unknown
  *
  * Empty objects and arrays are preserved as leaf values, so that flattening and
  * unflattening does not silently drop them.
+ *
+ * Two different paths can join to the same key when a key already contains the
+ * separator — `{ "a.b": 1, "a": { "b": 2 } }` yields `"a.b"` twice. That is
+ * refused rather than letting the second write bury the first.
  */
 export function flattenJson(input: unknown, options: NestingOptions = {}): FlatJson {
   const separator = resolveSeparator(options.separator);
@@ -49,43 +53,73 @@ export function flattenJson(input: unknown, options: NestingOptions = {}): FlatJ
     throw new TypeError('Nestify: flattenJson expects a JSON object or array at the top level.');
   }
 
-  const result: FlatJson = {};
-  walk(input, [], result, separator);
-  return result;
+  const into: Flattening = { leaves: new Map(), separator };
+
+  walk(input, [], into);
+
+  // Built in one go rather than assigned key by key: a plain `result[key] = …`
+  // with a key of "__proto__" sets the prototype instead of recording the key,
+  // which loses it. `Object.fromEntries` defines an own property either way,
+  // and a Map keeps the keys in the order they were met.
+  return Object.fromEntries([...into.leaves].map(([key, leaf]) => [key, leaf.value]));
 }
 
-function walk(value: unknown, path: string[], result: FlatJson, separator: string): void {
+/** The state a single `flattenJson` call threads through its recursion. */
+interface Flattening {
+  /** Flat key to its leaf value and the path that produced it. */
+  readonly leaves: Map<string, { readonly path: string[]; readonly value: unknown }>;
+  readonly separator: string;
+}
+
+function walk(value: unknown, path: string[], into: Flattening): void {
   if (Array.isArray(value)) {
     if (value.length === 0) {
-      assignLeaf(result, path, [], separator);
+      assignLeaf(into, path, []);
       return;
     }
-    value.forEach((item, index) => walk(item, [...path, String(index)], result, separator));
+    value.forEach((item, index) => walk(item, [...path, String(index)], into));
     return;
   }
 
   if (isPlainObject(value)) {
     const keys = Object.keys(value);
     if (keys.length === 0) {
-      assignLeaf(result, path, {}, separator);
+      assignLeaf(into, path, {});
       return;
     }
     for (const key of keys) {
-      walk(value[key], [...path, key], result, separator);
+      walk(value[key], [...path, key], into);
     }
     return;
   }
 
-  assignLeaf(result, path, value, separator);
+  assignLeaf(into, path, value);
 }
 
-function assignLeaf(result: FlatJson, path: string[], value: unknown, separator: string): void {
+function assignLeaf(into: Flattening, path: string[], value: unknown): void {
   // Only reachable when the whole document is an empty object or array; there
   // is no key to record it under, so the flat result is simply empty.
   if (path.length === 0) {
     return;
   }
-  result[path.join(separator)] = value;
+
+  const flatKey = path.join(into.separator);
+  const taken = into.leaves.get(flatKey);
+
+  if (taken) {
+    throw new SyntaxError(
+      `Nestify: the key "${flatKey}" would be written twice — ${describePath(taken.path)} and ` +
+        `${describePath(path)} join to the same key. Set the separator to a character ` +
+        'your keys do not contain.'
+    );
+  }
+
+  into.leaves.set(flatKey, { path, value });
+}
+
+/** Names a path the way the source spells it, so both sides of a clash are readable. */
+function describePath(path: string[]): string {
+  return path.map((segment) => JSON.stringify(segment)).join(' → ');
 }
 
 /**

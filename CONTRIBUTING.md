@@ -5,6 +5,7 @@
 ```bash
 npm install
 npm run compile     # or: npm run watch
+npm test            # compiles, then runs the unit tests
 ```
 
 Press `F5` in VS Code to launch an Extension Development Host with Nestify loaded.
@@ -19,10 +20,13 @@ src/
   converters/
     registry.ts                    Converter registry (id, title, run)
     jsonFlattenConverters.ts       registers "flatten" and "unflatten"
+  test/
+    jsonNesting.test.ts            node:test suite over the pure helpers
 ```
 
 `jsonNesting.ts` imports nothing from `vscode`, so the conversion logic stays testable
-on its own.
+on its own. `npm test` compiles the project and runs `node --test` over `out/test`;
+tests are kept out of the published `.vsix` by `.vscodeignore`.
 
 ## Adding a converter
 

@@ -53,7 +53,16 @@ export function summariseActiveJson(): ActiveJsonSummary {
   }
 
   const separator = vscode.workspace.getConfiguration('nestify').get<string>('separator', '.') || '.';
-  const keyCount = Object.keys(flattenJson(parsed, { separator })).length;
+  let keyCount: number;
+
+  try {
+    keyCount = Object.keys(flattenJson(parsed, { separator })).length;
+  } catch (error) {
+    // Valid JSON that still cannot be flattened, such as two keys that join to
+    // the same path. Saying so here beats a count the conversion would refuse.
+    return { problem: asSentence(error) };
+  }
+
   const depth = depthOf(parsed);
   const keys = `${keyCount} ${keyCount === 1 ? 'key' : 'keys'}`;
   const nesting = depth <= 1 ? 'flat' : `${depth} levels deep`;
@@ -64,6 +73,16 @@ export function summariseActiveJson(): ActiveJsonSummary {
     headerDetail: hasSelection ? `Selection: ${keys} · ${nesting}` : `${keys} · ${nesting}`,
     shape: depth <= 1 ? 'flat' : 'nested'
   };
+}
+
+/** Turns a thrown Nestify error into prose the view can show above the list. */
+function asSentence(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return 'This JSON cannot be flattened.';
+  }
+
+  const message = error.message.replace(/^Nestify: /, '');
+  return message.charAt(0).toUpperCase() + message.slice(1);
 }
 
 /**
