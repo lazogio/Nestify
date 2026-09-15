@@ -25,16 +25,16 @@ jobs:
 
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # A dispatch run commits the version bump, so it needs main, not a detached tag.
           ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install dependencies
         run: npm install
