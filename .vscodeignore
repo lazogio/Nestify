@@ -4,6 +4,7 @@
 node_modules/**
 src/**
 out/**/*.map
+out/test/**
 images/icon.svg
 .gitignore
 tsconfig.json

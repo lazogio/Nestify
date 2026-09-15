@@ -56,7 +56,9 @@ object, not an array. This is deliberate: it keeps gaps and out-of-order numeric
 intact. If you round-trip arrays, expect objects on the way back.
 
 Keys that clash, contain an empty segment, or use a reserved name such as `__proto__`
-are refused, and the message names the key at fault.
+are refused, and the message names the key at fault. That includes flattening a file
+where a literal `"a.b"` sits next to a nested `"a": { "b": … }` — both would become the
+same key, so Nestify says so instead of keeping one of the two.
 
 ## Contributing
 

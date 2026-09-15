@@ -2,6 +2,21 @@
 
 All notable changes to Nestify are documented in this file.
 
+## [0.0.4] - Unreleased
+
+### Fixed
+
+- Flattening no longer drops a key when two paths join to the same flat key.
+  `{ "a.b": 1, "a": { "b": 2 } }` used to keep only the second value; it now
+  names both clashing paths and changes nothing. A key called `__proto__` is
+  likewise carried through as data instead of disappearing.
+- The Activity Bar view states the clash above the list rather than reporting a
+  key count the conversion would refuse.
+
+### Added
+
+- Unit tests for `flattenJson` / `unflattenJson`, run with `npm test`.
+
 ## [0.0.3] - 2026-09-15
 
 ### Added
