@@ -1,53 +1,105 @@
 import * as vscode from 'vscode';
+import { summariseActiveJson } from './activeJsonSummary';
 import { Converter, listConverters } from './converters/registry';
 
+/** The top row, describing the text a conversion would run on. */
+interface SourceRow {
+  readonly kind: 'source';
+}
+
+type Row = SourceRow | Converter;
+
+function isSource(row: Row): row is SourceRow {
+  return (row as SourceRow).kind === 'source';
+}
+
 /**
- * Backs the Nestify view in the Activity Bar with one row per registered
- * converter, so a converter added to the registry shows up without any UI work.
+ * Backs the Nestify view in the Activity Bar: one row describing the JSON in
+ * front of you, then one row per registered converter.
  *
- * Each row is a single line: title, then the shape of the change with both
- * sides of the arrow side by side. One line keeps the comparison horizontal —
- * stacked before/after rows made the eye travel to spot a small difference.
+ * Each converter row is a single line — title, then the change with both sides
+ * of the arrow together. One line keeps the comparison horizontal; stacked
+ * before/after rows made the eye travel to spot a small difference.
  */
-export class ConverterTreeProvider implements vscode.TreeDataProvider<Converter> {
+export class ConverterTreeProvider implements vscode.TreeDataProvider<Row> {
   private readonly changed = new vscode.EventEmitter<void>();
+  private pending: ReturnType<typeof setTimeout> | undefined;
 
   readonly onDidChangeTreeData = this.changed.event;
 
-  /** Re-reads the registry, for converters registered after activation. */
+  /** Re-reads the registry and the active editor. */
   refresh(): void {
     this.changed.fire();
   }
 
-  getTreeItem(converter: Converter): vscode.TreeItem {
-    // The short name leaves the row's width for the change itself.
-    const item = new vscode.TreeItem(
-      converter.shortTitle ?? converter.title,
-      vscode.TreeItemCollapsibleState.None
-    );
+  /**
+   * Coalesces bursts of refreshes. Typing in the active file fires a change per
+   * keystroke, and each refresh re-parses the document.
+   */
+  scheduleRefresh(delayMs = 300): void {
+    if (this.pending) {
+      clearTimeout(this.pending);
+    }
 
-    item.id = converter.id;
-    item.description = converter.hint;
-    item.iconPath = new vscode.ThemeIcon(themeIconFor(converter.id));
-    item.tooltip = tooltipFor(converter);
-    // The whole row is the button, so no inline action competes with it.
-    item.command = {
-      command: 'nestify.runConverter',
-      title: converter.title,
-      arguments: [converter.id]
-    };
-
-    return item;
+    this.pending = setTimeout(() => {
+      this.pending = undefined;
+      this.refresh();
+    }, delayMs);
   }
 
-  getChildren(element?: Converter): Converter[] {
-    // A flat list: converters have no children.
-    return element ? [] : listConverters();
+  getTreeItem(row: Row): vscode.TreeItem {
+    return isSource(row) ? sourceItem() : converterItem(row);
+  }
+
+  getChildren(row?: Row): Row[] {
+    // A flat list: neither row type has children.
+    return row ? [] : [{ kind: 'source' }, ...listConverters()];
   }
 
   dispose(): void {
+    if (this.pending) {
+      clearTimeout(this.pending);
+    }
+
     this.changed.dispose();
   }
+}
+
+function sourceItem(): vscode.TreeItem {
+  const summary = summariseActiveJson();
+  const item = new vscode.TreeItem(summary.label, vscode.TreeItemCollapsibleState.None);
+
+  item.id = 'nestify.source';
+  item.description = summary.detail;
+  item.iconPath = new vscode.ThemeIcon(summary.icon);
+  item.tooltip = new vscode.MarkdownString(
+    summary.convertible
+      ? 'The text a conversion will run on: the selection when there is one, otherwise the whole file.'
+      : 'Nestify cannot convert this yet. Select valid JSON, or open a JSON file.'
+  );
+
+  return item;
+}
+
+function converterItem(converter: Converter): vscode.TreeItem {
+  // The short name leaves the row's width for the change itself.
+  const item = new vscode.TreeItem(
+    converter.shortTitle ?? converter.title,
+    vscode.TreeItemCollapsibleState.None
+  );
+
+  item.id = converter.id;
+  item.description = converter.hint;
+  item.iconPath = new vscode.ThemeIcon(themeIconFor(converter.id));
+  item.tooltip = tooltipFor(converter);
+  // The whole row is the button, so no inline action competes with it.
+  item.command = {
+    command: 'nestify.runConverter',
+    title: converter.title,
+    arguments: [converter.id]
+  };
+
+  return item;
 }
 
 /**

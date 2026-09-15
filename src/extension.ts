@@ -19,6 +19,19 @@ export function activate(context: vscode.ExtensionContext): void {
       runConverter(target)
     ),
     vscode.window.registerTreeDataProvider('nestify.converters', converterTree),
+    // Keep the view's top row honest about what a conversion would act on.
+    vscode.window.onDidChangeActiveTextEditor(() => converterTree.refresh()),
+    vscode.window.onDidChangeTextEditorSelection(() => converterTree.scheduleRefresh(150)),
+    vscode.workspace.onDidChangeTextDocument((event) => {
+      if (event.document === vscode.window.activeTextEditor?.document) {
+        converterTree.scheduleRefresh();
+      }
+    }),
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration('nestify.separator')) {
+        converterTree.refresh();
+      }
+    }),
     converterTree
   );
 }
