@@ -13,6 +13,11 @@
     "url": "https://github.com/lazogio/Nestify/issues"
   },
   "homepage": "https://github.com/lazogio/Nestify#readme",
+  "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#5B5BF0",
+    "theme": "dark"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -33,13 +38,28 @@
     "commands": [
       {
         "command": "nestify.flatten",
-        "title": "Nestify: Flatten JSON",
-        "category": "Nestify"
+        "title": "Flatten JSON",
+        "category": "Nestify",
+        "icon": "$(list-flat)"
       },
       {
         "command": "nestify.unflatten",
-        "title": "Nestify: Unflatten (Nest) JSON",
-        "category": "Nestify"
+        "title": "Unflatten (Nest) JSON",
+        "category": "Nestify",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "nestify.convert",
+        "title": "Convert With…",
+        "category": "Nestify",
+        "icon": "$(json)"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "nestify.submenu",
+        "label": "Nestify",
+        "icon": "$(json)"
       }
     ],
     "menus": {
@@ -51,18 +71,43 @@
         {
           "command": "nestify.unflatten",
           "when": "editorIsOpen"
+        },
+        {
+          "command": "nestify.convert",
+          "when": "editorIsOpen"
         }
       ],
       "editor/context": [
         {
-          "command": "nestify.flatten",
+          "submenu": "nestify.submenu",
           "when": "editorTextFocus",
           "group": "1_modification@10"
+        }
+      ],
+      "nestify.submenu": [
+        {
+          "command": "nestify.flatten",
+          "group": "nestify@10"
         },
         {
           "command": "nestify.unflatten",
-          "when": "editorTextFocus",
-          "group": "1_modification@11"
+          "group": "nestify@20"
+        },
+        {
+          "command": "nestify.convert",
+          "group": "nestify@30"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "nestify.flatten",
+          "when": "resourceLangId == json || resourceLangId == jsonc",
+          "group": "navigation@10"
+        },
+        {
+          "command": "nestify.unflatten",
+          "when": "resourceLangId == json || resourceLangId == jsonc",
+          "group": "navigation@20"
         }
       ]
     },

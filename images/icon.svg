@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Nestify">
+  <title>Nestify</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5B5BF0"/>
+      <stop offset="1" stop-color="#8B3FE8"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <path id="brace"
+          d="M56 29 C48.5 29 46 32.5 46 40 L46 54 C46 60 40 64 30 64 C40 64 46 68 46 74 L46 88 C46 95.5 48.5 99 56 99"
+          fill="none" stroke="#FFFFFF" stroke-width="9"
+          stroke-linecap="round" stroke-linejoin="round"/>
+  </defs>
+
+  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+  <rect width="128" height="128" rx="28" fill="url(#sheen)"/>
+
+  <use href="#brace"/>
+  <use href="#brace" transform="translate(128,0) scale(-1,1)"/>
+
+  <circle cx="64" cy="64" r="8.5" fill="#FCD34D"/>
+</svg>
