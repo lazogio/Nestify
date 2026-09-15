@@ -1,6 +1,18 @@
 name: Publish Extension
 
 on:
+  # Tap "Run workflow" from the GitHub mobile site to cut a release.
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Which part of the version to raise'
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+  # Pushing a v* tag by hand still publishes that exact version.
   push:
     tags:
       - 'v*'
@@ -8,10 +20,16 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
-      - name: Check out the tag
+      - name: Check out the repository
         uses: actions/checkout@v4
+        with:
+          # A dispatch run commits the version bump, so it needs main, not a detached tag.
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -24,7 +42,23 @@ jobs:
       - name: Compile
         run: npm run compile
 
-      - name: Publish to the VS Code Marketplace
+      - name: Identify the commit author
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+      # vsce raises the version, commits it, tags it, then publishes in one step.
+      - name: Raise the version and publish
+        if: github.event_name == 'workflow_dispatch'
+        run: npx --yes @vscode/vsce publish ${{ inputs.bump }} --pat ${{ secrets.VSCE_PAT }}
+
+      - name: Push the version bump and its tag
+        if: github.event_name == 'workflow_dispatch'
+        run: git push --follow-tags origin main
+
+      - name: Publish the tagged version
+        if: github.event_name == 'push'
         run: npx --yes @vscode/vsce publish --pat ${{ secrets.VSCE_PAT }}
 
       - name: Publish to Open VSX
