@@ -12,8 +12,14 @@ export interface Converter {
   /** Human readable name, used in error messages and pickers. */
   readonly title: string;
   /**
-   * Optional few-word summary of the transform, shown next to the title in the
-   * Activity Bar view and in the quick pick. Keep it short enough not to wrap.
+   * Optional one or two word name used where space is tight, such as the
+   * Activity Bar view. Falls back to `title`.
+   */
+  readonly shortTitle?: string;
+  /**
+   * Optional summary of the transform, shown next to the title in the Activity
+   * Bar view and in the quick pick. Both sides of the change on one line reads
+   * faster than stacking them, so keep it to roughly 25 characters.
    */
   readonly hint?: string;
   /** Transforms the source text, or throws an Error explaining why it cannot. */

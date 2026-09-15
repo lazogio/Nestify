@@ -9,9 +9,9 @@ All notable changes to Nestify are documented in this file.
 - Nestify icon in the Activity Bar, opening a **Converters** view that lists every
   registered converter — click one to apply it. Converters added to the registry
   appear here without any extra wiring.
-- Flatten and nest buttons in the view's header, and a run button on each row.
-- A before/after sample under every converter, expanded in the view itself rather
-  than hidden behind a hover.
+- Flatten and nest buttons in the view's header.
+- Each row shows the change on one line — `{"a":{"b":2}} → {"a.b":2}` — with the
+  roomier before/after in the tooltip.
 - Optional `hint` on a converter: a few words describing the transform, shown beside
   the title in the view and in `Nestify: Convert With…`.
 

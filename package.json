@@ -57,8 +57,7 @@
       {
         "command": "nestify.runConverter",
         "title": "Run Converter",
-        "category": "Nestify",
-        "icon": "$(play)"
+        "category": "Nestify"
       }
     ],
     "viewsContainers": {
@@ -130,13 +129,6 @@
         {
           "command": "nestify.convert",
           "group": "nestify@30"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "nestify.runConverter",
-          "when": "view == nestify.converters && viewItem == nestifyConverter",
-          "group": "inline"
         }
       ],
       "view/title": [

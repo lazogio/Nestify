@@ -1,25 +1,15 @@
 import * as vscode from 'vscode';
 import { Converter, listConverters } from './converters/registry';
 
-/** A before/after line shown under its converter when the row is expanded. */
-interface ExampleRow {
-  readonly kind: 'example';
-  readonly label: 'before' | 'after';
-  readonly json: string;
-}
-
-type Row = Converter | ExampleRow;
-
-function isExample(row: Row): row is ExampleRow {
-  return (row as ExampleRow).kind === 'example';
-}
-
 /**
  * Backs the Nestify view in the Activity Bar with one row per registered
  * converter, so a converter added to the registry shows up without any UI work.
- * Expanding a row shows what the conversion does to a small sample.
+ *
+ * Each row is a single line: title, then the shape of the change with both
+ * sides of the arrow side by side. One line keeps the comparison horizontal —
+ * stacked before/after rows made the eye travel to spot a small difference.
  */
-export class ConverterTreeProvider implements vscode.TreeDataProvider<Row> {
+export class ConverterTreeProvider implements vscode.TreeDataProvider<Converter> {
   private readonly changed = new vscode.EventEmitter<void>();
 
   readonly onDidChangeTreeData = this.changed.event;
@@ -29,16 +19,30 @@ export class ConverterTreeProvider implements vscode.TreeDataProvider<Row> {
     this.changed.fire();
   }
 
-  getTreeItem(row: Row): vscode.TreeItem {
-    return isExample(row) ? exampleItem(row) : converterItem(row);
+  getTreeItem(converter: Converter): vscode.TreeItem {
+    // The short name leaves the row's width for the change itself.
+    const item = new vscode.TreeItem(
+      converter.shortTitle ?? converter.title,
+      vscode.TreeItemCollapsibleState.None
+    );
+
+    item.id = converter.id;
+    item.description = converter.hint;
+    item.iconPath = new vscode.ThemeIcon(themeIconFor(converter.id));
+    item.tooltip = tooltipFor(converter);
+    // The whole row is the button, so no inline action competes with it.
+    item.command = {
+      command: 'nestify.runConverter',
+      title: converter.title,
+      arguments: [converter.id]
+    };
+
+    return item;
   }
 
-  getChildren(row?: Row): Row[] {
-    if (!row) {
-      return listConverters();
-    }
-
-    return isExample(row) ? [] : examplesFor(row.id);
+  getChildren(element?: Converter): Converter[] {
+    // A flat list: converters have no children.
+    return element ? [] : listConverters();
   }
 
   dispose(): void {
@@ -46,62 +50,30 @@ export class ConverterTreeProvider implements vscode.TreeDataProvider<Row> {
   }
 }
 
-function converterItem(converter: Converter): vscode.TreeItem {
-  const hasExample = examplesFor(converter.id).length > 0;
+/**
+ * The row is deliberately terse, so the tooltip carries the roomier version for
+ * anyone who wants it.
+ */
+function tooltipFor(converter: Converter): vscode.MarkdownString {
+  const tooltip = new vscode.MarkdownString();
 
-  const item = new vscode.TreeItem(
-    converter.title,
-    hasExample ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None
-  );
+  tooltip.appendMarkdown(`**${converter.title}**\n\n`);
+  tooltip.appendMarkdown('Click to run on the selection, or on the whole file when nothing is selected.');
 
-  item.id = converter.id;
-  // The hint reads as a transform, which is more use than repeating the id.
-  item.description = converter.hint;
-  item.iconPath = new vscode.ThemeIcon(themeIconFor(converter.id));
-  item.tooltip = new vscode.MarkdownString(
-    `Run **${converter.title}** on the selection, or on the whole file when nothing is selected.`
-  );
-  // Drives the inline run button contributed in package.json.
-  item.contextValue = 'nestifyConverter';
-  item.command = {
-    command: 'nestify.runConverter',
-    title: converter.title,
-    arguments: [converter.id]
-  };
+  const example = examples[converter.id];
 
-  return item;
-}
-
-function exampleItem(example: ExampleRow): vscode.TreeItem {
-  const item = new vscode.TreeItem(example.json, vscode.TreeItemCollapsibleState.None);
-
-  // The JSON is the label so it reads first; the side note says which side it is.
-  item.description = example.label;
-  item.tooltip = new vscode.MarkdownString(`\`\`\`json\n${example.json}\n\`\`\``);
-
-  return item;
-}
-
-/** Kept short on purpose: the view is narrow and long samples just truncate. */
-function examplesFor(converterId: string): ExampleRow[] {
-  const nested = '{ "app": { "name": "nestify" } }';
-  const flat = '{ "app.name": "nestify" }';
-
-  switch (converterId) {
-    case 'flatten':
-      return [
-        { kind: 'example', label: 'before', json: nested },
-        { kind: 'example', label: 'after', json: flat }
-      ];
-    case 'unflatten':
-      return [
-        { kind: 'example', label: 'before', json: flat },
-        { kind: 'example', label: 'after', json: nested }
-      ];
-    default:
-      return [];
+  if (example) {
+    tooltip.appendMarkdown('\n\n');
+    tooltip.appendCodeblock(example, 'jsonc');
   }
+
+  return tooltip;
 }
+
+const examples: Record<string, string> = {
+  flatten: '// before\n{ "app": { "name": "nestify" } }\n\n// after\n{ "app.name": "nestify" }',
+  unflatten: '// before\n{ "app.name": "nestify" }\n\n// after\n{ "app": { "name": "nestify" } }'
+};
 
 /** Matches the icons already used by the toolbar buttons, falling back to a generic one. */
 function themeIconFor(converterId: string): string {

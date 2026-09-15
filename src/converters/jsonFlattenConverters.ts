@@ -40,7 +40,8 @@ function stringify(value: unknown, indent: number): string {
 registerConverter({
   id: 'flatten',
   title: 'Flatten JSON',
-  hint: 'nested → a.b.c',
+  shortTitle: 'Flatten',
+  hint: '{"a":{"b":2}} → {"a.b":2}',
   run(sourceText: string): string {
     const { separator, indent } = readSettings();
     const parsed = parseJson(sourceText);
@@ -56,7 +57,8 @@ registerConverter({
 registerConverter({
   id: 'unflatten',
   title: 'Unflatten (Nest) JSON',
-  hint: 'a.b.c → nested',
+  shortTitle: 'Nest',
+  hint: '{"a.b":2} → {"a":{"b":2}}',
   run(sourceText: string): string {
     const { separator, indent } = readSettings();
     const parsed = parseJson(sourceText);
