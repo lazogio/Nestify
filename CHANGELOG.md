@@ -2,6 +2,14 @@
 
 All notable changes to Nestify are documented in this file.
 
+## [0.0.2] - 2026-09-15
+
+### Changed
+
+- Clearer Marketplace description, naming the three ways to run a conversion.
+- Rewrote the README around using the extension; moved setup, architecture, and
+  release steps into `CONTRIBUTING.md`.
+
 ## [0.0.1] - 2026-09-15
 
 ### Added
