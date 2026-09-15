@@ -3,7 +3,7 @@
   "displayName": "Nestify — JSON Flatten & Nest",
   "description": "Flatten nested JSON into dot-joined keys and nest it back again, right inside the editor.",
   "version": "0.0.1",
-  "publisher": "giorgilazareshvili",
+  "publisher": "GiorgiLazareshvili",
   "license": "MIT",
   "repository": {
     "type": "git",
