@@ -1,20 +1,44 @@
 import * as vscode from 'vscode';
-import { Converter, listConverters, requireConverter } from './converters/registry';
+import { Converter, getConverter, listConverters, requireConverter } from './converters/registry';
+import { ConverterTreeProvider } from './converterTreeView';
 
 // Imported for the side effect: the module registers the JSON converters.
 // A new converter module only has to be imported here as well.
 import './converters/jsonFlattenConverters';
 
 export function activate(context: vscode.ExtensionContext): void {
+  const converterTree = new ConverterTreeProvider();
+
   context.subscriptions.push(
     vscode.commands.registerCommand('nestify.flatten', () => applyConverter(requireConverter('flatten'))),
     vscode.commands.registerCommand('nestify.unflatten', () => applyConverter(requireConverter('unflatten'))),
-    vscode.commands.registerCommand('nestify.convert', () => pickAndApplyConverter())
+    vscode.commands.registerCommand('nestify.convert', () => pickAndApplyConverter()),
+    // Invoked by the Activity Bar view, which passes the converter id.
+    vscode.commands.registerCommand('nestify.runConverter', (converterId: string) =>
+      runConverterById(converterId)
+    ),
+    vscode.window.registerTreeDataProvider('nestify.converters', converterTree),
+    converterTree
   );
 }
 
 export function deactivate(): void {
   // Nothing to clean up.
+}
+
+/**
+ * Runs a converter named by id. Reports a readable message instead of throwing
+ * when the id is unknown, since the caller is a UI element rather than code.
+ */
+async function runConverterById(converterId: string): Promise<void> {
+  const converter = getConverter(converterId);
+
+  if (!converter) {
+    vscode.window.showErrorMessage(`Nestify: no converter registered for "${converterId}".`);
+    return;
+  }
+
+  await applyConverter(converter);
 }
 
 /**

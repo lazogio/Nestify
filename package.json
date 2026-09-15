@@ -53,6 +53,36 @@
         "title": "Convert With…",
         "category": "Nestify",
         "icon": "$(json)"
+      },
+      {
+        "command": "nestify.runConverter",
+        "title": "Run Converter",
+        "category": "Nestify"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "nestify",
+          "title": "Nestify",
+          "icon": "images/activity-bar.svg"
+        }
+      ]
+    },
+    "views": {
+      "nestify": [
+        {
+          "id": "nestify.converters",
+          "name": "Converters",
+          "icon": "images/activity-bar.svg",
+          "contextualTitle": "Nestify"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "nestify.converters",
+        "contents": "Open a JSON file, select the part you want to convert, then pick a converter above.\nNothing selected converts the whole file."
       }
     ],
     "submenus": [
@@ -75,6 +105,10 @@
         {
           "command": "nestify.convert",
           "when": "editorIsOpen"
+        },
+        {
+          "command": "nestify.runConverter",
+          "when": "false"
         }
       ],
       "editor/context": [

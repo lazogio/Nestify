@@ -2,6 +2,14 @@
 
 All notable changes to Nestify are documented in this file.
 
+## [0.0.3] - 2026-09-15
+
+### Added
+
+- Nestify icon in the Activity Bar, opening a **Converters** view that lists every
+  registered converter — click one to apply it. Converters added to the registry
+  appear here without any extra wiring.
+
 ## [0.0.2] - 2026-09-15
 
 ### Changed

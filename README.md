@@ -29,6 +29,7 @@ Then pick whichever is closest to hand:
 - **Toolbar** — on a `.json` or `.jsonc` file, two buttons sit top-right of the editor: flatten and nest.
 - **Right-click** — **Nestify** → *Flatten JSON* / *Unflatten (Nest) JSON*.
 - **Command Palette** — `Cmd+Shift+P` / `Ctrl+Shift+P`, then type `Nestify`.
+- **Sidebar** — the Nestify icon in the Activity Bar lists every converter; click one to run it.
 
 The converted text stays selected so you can see what changed. Invalid JSON changes
 nothing and tells you what is wrong.
