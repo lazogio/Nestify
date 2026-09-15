@@ -1,0 +1,97 @@
+{
+  "name": "nestify",
+  "displayName": "Nestify — JSON Flatten & Nest",
+  "description": "Flatten nested JSON into dot-joined keys and nest it back again, right inside the editor.",
+  "version": "0.0.1",
+  "publisher": "your-publisher-name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lazogio/Nestify.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lazogio/Nestify/issues"
+  },
+  "homepage": "https://github.com/lazogio/Nestify#readme",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Formatters",
+    "Other"
+  ],
+  "keywords": [
+    "json",
+    "flatten",
+    "unflatten",
+    "nest",
+    "i18n"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "nestify.flatten",
+        "title": "Nestify: Flatten JSON",
+        "category": "Nestify"
+      },
+      {
+        "command": "nestify.unflatten",
+        "title": "Nestify: Unflatten (Nest) JSON",
+        "category": "Nestify"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "nestify.flatten",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "nestify.unflatten",
+          "when": "editorIsOpen"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "nestify.flatten",
+          "when": "editorTextFocus",
+          "group": "1_modification@10"
+        },
+        {
+          "command": "nestify.unflatten",
+          "when": "editorTextFocus",
+          "group": "1_modification@11"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Nestify",
+      "properties": {
+        "nestify.separator": {
+          "type": "string",
+          "default": ".",
+          "description": "Separator used to join and split nested key paths."
+        },
+        "nestify.indent": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "maximum": 10,
+          "description": "Number of spaces used to indent the JSON that Nestify writes back."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.5"
+  }
+}

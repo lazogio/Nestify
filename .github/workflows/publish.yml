@@ -1,0 +1,32 @@
+name: Publish Extension
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Compile
+        run: npm run compile
+
+      - name: Publish to the VS Code Marketplace
+        run: npx --yes @vscode/vsce publish --pat ${{ secrets.VSCE_PAT }}
+
+      - name: Publish to Open VSX
+        continue-on-error: true
+        run: npx --yes ovsx publish --pat ${{ secrets.OVSX_PAT }}
