@@ -9,23 +9,29 @@ import './converters/jsonFlattenConverters';
 
 export function activate(context: vscode.ExtensionContext): void {
   const converterTree = new ConverterTreeProvider();
+  const view = vscode.window.createTreeView('nestify.converters', {
+    treeDataProvider: converterTree
+  });
+
+  syncHeader(view, converterTree);
 
   context.subscriptions.push(
     vscode.commands.registerCommand('nestify.flatten', () => applyConverter(requireConverter('flatten'))),
     vscode.commands.registerCommand('nestify.unflatten', () => applyConverter(requireConverter('unflatten'))),
     vscode.commands.registerCommand('nestify.convert', () => pickAndApplyConverter()),
-    // Invoked by the Activity Bar view: a row click passes the converter id, the
-    // inline run button passes the row's converter itself.
+    // Invoked by the Activity Bar view, which passes the row's converter id.
     vscode.commands.registerCommand('nestify.runConverter', (target: string | Converter) =>
       runConverter(target)
     ),
     trackActiveEditor(),
-    vscode.window.registerTreeDataProvider('nestify.converters', converterTree),
-    // Keep the view's top row honest about what a conversion would act on.
+    view,
+    // The header carries the state; the rows stay a list of actions.
+    converterTree.onDidChangeTreeData(() => syncHeader(view, converterTree)),
+    // Keep the header honest about what a conversion would act on.
     vscode.window.onDidChangeActiveTextEditor(() => converterTree.refresh()),
     vscode.window.onDidChangeTextEditorSelection(() => converterTree.scheduleRefresh(150)),
     vscode.workspace.onDidChangeTextDocument((event) => {
-      if (event.document === vscode.window.activeTextEditor?.document) {
+      if (event.document === targetEditor()?.document) {
         converterTree.scheduleRefresh();
       }
     }),
@@ -36,6 +42,17 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     converterTree
   );
+}
+
+/**
+ * Puts the shape of the active JSON beside the view's title, and any reason it
+ * cannot be converted above the list.
+ */
+function syncHeader(view: vscode.TreeView<Converter>, provider: ConverterTreeProvider): void {
+  const summary = provider.currentSummary();
+
+  view.description = summary.headerDetail;
+  view.message = summary.problem;
 }
 
 export function deactivate(): void {

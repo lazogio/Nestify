@@ -2,16 +2,14 @@ import * as vscode from 'vscode';
 import { targetEditor } from './activeEditor';
 import { flattenJson } from './jsonNesting';
 
-/** What the view says about the text a conversion would run on. */
+/** What the view knows about the text a conversion would run on. */
 export interface ActiveJsonSummary {
-  /** What is being measured: a file name, or a file name marked as a selection. */
-  readonly label: string;
-  /** The shape of that text, or why it cannot be measured. */
-  readonly detail: string;
-  /** A codicon id reflecting whether Nestify could run right now. */
-  readonly icon: string;
-  /** True when the text parses as a JSON object or array. */
-  readonly convertible: boolean;
+  /** Shown beside the view's title, e.g. "66 keys · 10 levels". */
+  readonly headerDetail?: string;
+  /** Prose shown above the list when nothing can be converted. */
+  readonly problem?: string;
+  /** Whether that text is already flat, nested, or unknown. */
+  readonly shape?: 'flat' | 'nested';
 }
 
 // Parsing runs on every keystroke in the active file, so skip pathological sizes.
@@ -26,25 +24,20 @@ export function summariseActiveJson(): ActiveJsonSummary {
   const editor = targetEditor();
 
   if (!editor) {
-    return {
-      label: 'No file open',
-      detail: 'open JSON to convert it',
-      icon: 'circle-slash',
-      convertible: false
-    };
+    return { problem: 'Open a JSON file to convert it.' };
   }
 
   const document = editor.document;
   const hasSelection = !editor.selection.isEmpty;
   const text = hasSelection ? document.getText(editor.selection) : document.getText();
-  const label = hasSelection ? `${fileNameOf(document)} — selection` : fileNameOf(document);
+  const scope = hasSelection ? 'selection' : 'file';
 
   if (text.trim().length === 0) {
-    return { label, detail: 'nothing to convert', icon: 'circle-slash', convertible: false };
+    return { problem: `The ${scope} is empty.` };
   }
 
   if (text.length > MAX_ANALYSED_CHARS) {
-    return { label, detail: 'too large to preview', icon: 'file', convertible: true };
+    return { headerDetail: `${scope} · too large to measure` };
   }
 
   let parsed: unknown;
@@ -52,25 +45,25 @@ export function summariseActiveJson(): ActiveJsonSummary {
   try {
     parsed = JSON.parse(text.trim());
   } catch {
-    return { label, detail: 'not valid JSON', icon: 'warning', convertible: false };
+    return { problem: `The ${scope} is not valid JSON.` };
   }
 
   if (typeof parsed !== 'object' || parsed === null) {
-    return { label, detail: 'a single value, not an object', icon: 'warning', convertible: false };
+    return { problem: `The ${scope} is a single value, not an object or array.` };
   }
 
-  return { label, detail: describeShape(parsed), icon: 'symbol-namespace', convertible: true };
-}
-
-/** Reads as "12 keys · 3 levels deep", the two numbers a conversion changes. */
-function describeShape(parsed: object): string {
   const separator = vscode.workspace.getConfiguration('nestify').get<string>('separator', '.') || '.';
   const keyCount = Object.keys(flattenJson(parsed, { separator })).length;
   const depth = depthOf(parsed);
-
   const keys = `${keyCount} ${keyCount === 1 ? 'key' : 'keys'}`;
+  const nesting = depth <= 1 ? 'flat' : `${depth} levels`;
 
-  return depth <= 1 ? `${keys} · flat` : `${keys} · ${depth} levels deep`;
+  return {
+    // The file name is already on the editor tab, so the header spends its
+    // width on the two numbers a conversion changes.
+    headerDetail: hasSelection ? `selection · ${keys} · ${nesting}` : `${keys} · ${nesting}`,
+    shape: depth <= 1 ? 'flat' : 'nested'
+  };
 }
 
 /**
@@ -92,12 +85,4 @@ function depthOf(value: unknown): number {
   }
 
   return 1 + Math.max(0, ...children.map(depthOf));
-}
-
-function fileNameOf(document: vscode.TextDocument): string {
-  if (document.isUntitled) {
-    return 'Untitled';
-  }
-
-  return document.fileName.split('/').pop() ?? document.fileName;
 }

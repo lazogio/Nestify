@@ -12,8 +12,11 @@ All notable changes to Nestify are documented in this file.
 - Flatten and nest buttons in the view's header.
 - Each row shows the change on one line — `{"a":{"b":2}} → {"a.b":2}` — with the
   roomier before/after in the tooltip.
-- A live top row in the view describing what a conversion would act on: the file
-  or selection, its key count and nesting depth, or why it cannot be converted.
+- The view's header reports what a conversion would act on — `66 keys · 10 levels`,
+  or `selection · …` when text is selected.
+- A converter that would not help says so instead of showing its example:
+  `already flat`, or `needs flat keys`. Anything blocking a conversion — invalid
+  JSON, no file open — is stated above the list.
 
 ### Fixed
 

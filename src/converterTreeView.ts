@@ -1,34 +1,26 @@
 import * as vscode from 'vscode';
-import { summariseActiveJson } from './activeJsonSummary';
+import { ActiveJsonSummary, summariseActiveJson } from './activeJsonSummary';
 import { Converter, listConverters } from './converters/registry';
 
-/** The top row, describing the text a conversion would run on. */
-interface SourceRow {
-  readonly kind: 'source';
-}
-
-type Row = SourceRow | Converter;
-
-function isSource(row: Row): row is SourceRow {
-  return (row as SourceRow).kind === 'source';
-}
-
 /**
- * Backs the Nestify view in the Activity Bar: one row describing the JSON in
- * front of you, then one row per registered converter.
+ * Backs the Nestify view in the Activity Bar with one row per registered
+ * converter, and keeps the view's header describing the JSON in front of you.
  *
- * Each converter row is a single line — title, then the change with both sides
- * of the arrow together. One line keeps the comparison horizontal; stacked
- * before/after rows made the eye travel to spot a small difference.
+ * The list holds actions only: what the file currently looks like is state, so
+ * it belongs in the header rather than in a row that merely looks clickable.
+ * Each row shows the change with both sides of the arrow together — one line
+ * keeps the comparison horizontal instead of making the eye travel.
  */
-export class ConverterTreeProvider implements vscode.TreeDataProvider<Row> {
+export class ConverterTreeProvider implements vscode.TreeDataProvider<Converter> {
   private readonly changed = new vscode.EventEmitter<void>();
   private pending: ReturnType<typeof setTimeout> | undefined;
+  private summary: ActiveJsonSummary = summariseActiveJson();
 
   readonly onDidChangeTreeData = this.changed.event;
 
   /** Re-reads the registry and the active editor. */
   refresh(): void {
+    this.summary = summariseActiveJson();
     this.changed.fire();
   }
 
@@ -47,13 +39,37 @@ export class ConverterTreeProvider implements vscode.TreeDataProvider<Row> {
     }, delayMs);
   }
 
-  getTreeItem(row: Row): vscode.TreeItem {
-    return isSource(row) ? sourceItem() : converterItem(row);
+  /** The last reading, for the code that keeps the view's header in step. */
+  currentSummary(): ActiveJsonSummary {
+    return this.summary;
   }
 
-  getChildren(row?: Row): Row[] {
-    // A flat list: neither row type has children.
-    return row ? [] : [{ kind: 'source' }, ...listConverters()];
+  getTreeItem(converter: Converter): vscode.TreeItem {
+    // The short name leaves the row's width for the change itself.
+    const item = new vscode.TreeItem(
+      converter.shortTitle ?? converter.title,
+      vscode.TreeItemCollapsibleState.None
+    );
+
+    const blocked = reasonToSkip(converter.id, this.summary);
+
+    item.id = converter.id;
+    item.description = blocked ?? converter.hint;
+    item.iconPath = new vscode.ThemeIcon(themeIconFor(converter.id));
+    item.tooltip = tooltipFor(converter, blocked);
+    // The whole row is the button, so no inline action competes with it.
+    item.command = {
+      command: 'nestify.runConverter',
+      title: converter.title,
+      arguments: [converter.id]
+    };
+
+    return item;
+  }
+
+  getChildren(element?: Converter): Converter[] {
+    // A flat list: converters have no children.
+    return element ? [] : listConverters();
   }
 
   dispose(): void {
@@ -65,51 +81,40 @@ export class ConverterTreeProvider implements vscode.TreeDataProvider<Row> {
   }
 }
 
-function sourceItem(): vscode.TreeItem {
-  const summary = summariseActiveJson();
-  const item = new vscode.TreeItem(summary.label, vscode.TreeItemCollapsibleState.None);
+/**
+ * Why running this converter now would not help, or `undefined` when it would.
+ * Saying so on the row is cheaper for the user than clicking and reading an
+ * error notification.
+ */
+function reasonToSkip(converterId: string, summary: ActiveJsonSummary): string | undefined {
+  if (!summary.shape) {
+    return undefined;
+  }
 
-  item.id = 'nestify.source';
-  item.description = summary.detail;
-  item.iconPath = new vscode.ThemeIcon(summary.icon);
-  item.tooltip = new vscode.MarkdownString(
-    summary.convertible
-      ? 'The text a conversion will run on: the selection when there is one, otherwise the whole file.'
-      : 'Nestify cannot convert this yet. Select valid JSON, or open a JSON file.'
-  );
+  if (converterId === 'flatten' && summary.shape === 'flat') {
+    return 'already flat';
+  }
 
-  return item;
-}
+  if (converterId === 'unflatten' && summary.shape === 'nested') {
+    return 'needs flat keys';
+  }
 
-function converterItem(converter: Converter): vscode.TreeItem {
-  // The short name leaves the row's width for the change itself.
-  const item = new vscode.TreeItem(
-    converter.shortTitle ?? converter.title,
-    vscode.TreeItemCollapsibleState.None
-  );
-
-  item.id = converter.id;
-  item.description = converter.hint;
-  item.iconPath = new vscode.ThemeIcon(themeIconFor(converter.id));
-  item.tooltip = tooltipFor(converter);
-  // The whole row is the button, so no inline action competes with it.
-  item.command = {
-    command: 'nestify.runConverter',
-    title: converter.title,
-    arguments: [converter.id]
-  };
-
-  return item;
+  return undefined;
 }
 
 /**
  * The row is deliberately terse, so the tooltip carries the roomier version for
  * anyone who wants it.
  */
-function tooltipFor(converter: Converter): vscode.MarkdownString {
+function tooltipFor(converter: Converter, blocked: string | undefined): vscode.MarkdownString {
   const tooltip = new vscode.MarkdownString();
 
   tooltip.appendMarkdown(`**${converter.title}**\n\n`);
+
+  if (blocked) {
+    tooltip.appendMarkdown(`${explanations[converter.id] ?? blocked}\n\n`);
+  }
+
   tooltip.appendMarkdown('Click to run on the selection, or on the whole file when nothing is selected.');
 
   const example = examples[converter.id];
@@ -121,6 +126,11 @@ function tooltipFor(converter: Converter): vscode.MarkdownString {
 
   return tooltip;
 }
+
+const explanations: Record<string, string> = {
+  flatten: 'This JSON has no nesting left to flatten.',
+  unflatten: 'This JSON is nested already — nesting expects keys joined by the separator.'
+};
 
 const examples: Record<string, string> = {
   flatten: '// before\n{ "app": { "name": "nestify" } }\n\n// after\n{ "app.name": "nestify" }',
