@@ -55,8 +55,8 @@ async function pickAndApplyConverter(): Promise<void> {
 
   const picked = await vscode.window.showQuickPick(
     converters.map((converter) => ({
-      label: `$(json) ${converter.title}`,
-      description: converter.id,
+      label: converter.title,
+      description: converter.hint,
       converter
     })),
     {

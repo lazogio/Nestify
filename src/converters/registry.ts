@@ -11,6 +11,11 @@ export interface Converter {
   readonly id: string;
   /** Human readable name, used in error messages and pickers. */
   readonly title: string;
+  /**
+   * Optional few-word summary of the transform, shown next to the title in the
+   * Activity Bar view and in the quick pick. Keep it short enough not to wrap.
+   */
+  readonly hint?: string;
   /** Transforms the source text, or throws an Error explaining why it cannot. */
   run(sourceText: string): string;
 }

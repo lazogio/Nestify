@@ -19,11 +19,10 @@ export class ConverterTreeProvider implements vscode.TreeDataProvider<Converter>
     const item = new vscode.TreeItem(converter.title, vscode.TreeItemCollapsibleState.None);
 
     item.id = converter.id;
-    item.description = converter.id;
+    // The hint reads as a transform, which is more use than repeating the id.
+    item.description = converter.hint;
     item.iconPath = new vscode.ThemeIcon(themeIconFor(converter.id));
-    item.tooltip = new vscode.MarkdownString(
-      `Apply **${converter.title}** to the selection, or to the whole file when nothing is selected.`
-    );
+    item.tooltip = tooltipFor(converter);
     item.command = {
       command: 'nestify.runConverter',
       title: converter.title,
@@ -42,6 +41,28 @@ export class ConverterTreeProvider implements vscode.TreeDataProvider<Converter>
     this.changed.dispose();
   }
 }
+
+function tooltipFor(converter: Converter): vscode.MarkdownString {
+  const tooltip = new vscode.MarkdownString();
+
+  tooltip.appendMarkdown(`**${converter.title}**\n\n`);
+  tooltip.appendMarkdown('Runs on the selection, or on the whole file when nothing is selected.');
+
+  const example = examples[converter.id];
+
+  if (example) {
+    tooltip.appendMarkdown('\n\n');
+    tooltip.appendCodeblock(example, 'jsonc');
+  }
+
+  return tooltip;
+}
+
+/** Shown in the row tooltip, so the shape of the change is visible before running it. */
+const examples: Record<string, string> = {
+  flatten: '{ "app": { "name": "nestify" } }\n\n{ "app.name": "nestify" }',
+  unflatten: '{ "app.name": "nestify" }\n\n{ "app": { "name": "nestify" } }'
+};
 
 /** Matches the icons already used by the toolbar buttons, falling back to a generic one. */
 function themeIconFor(converterId: string): string {

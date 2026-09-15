@@ -74,8 +74,7 @@
         {
           "id": "nestify.converters",
           "name": "Converters",
-          "icon": "images/activity-bar.svg",
-          "contextualTitle": "Nestify"
+          "icon": "images/activity-bar.svg"
         }
       ]
     },
@@ -130,6 +129,18 @@
         {
           "command": "nestify.convert",
           "group": "nestify@30"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "nestify.flatten",
+          "when": "view == nestify.converters",
+          "group": "navigation@10"
+        },
+        {
+          "command": "nestify.unflatten",
+          "when": "view == nestify.converters",
+          "group": "navigation@20"
         }
       ],
       "editor/title": [
