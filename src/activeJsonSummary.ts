@@ -4,7 +4,7 @@ import { flattenJson } from './jsonNesting';
 
 /** What the view knows about the text a conversion would run on. */
 export interface ActiveJsonSummary {
-  /** Shown beside the view's title, e.g. "66 keys · 10 levels". */
+  /** The shape of that text, e.g. "66 keys · 10 levels deep". */
   readonly headerDetail?: string;
   /** Prose shown above the list when nothing can be converted. */
   readonly problem?: string;
@@ -56,12 +56,12 @@ export function summariseActiveJson(): ActiveJsonSummary {
   const keyCount = Object.keys(flattenJson(parsed, { separator })).length;
   const depth = depthOf(parsed);
   const keys = `${keyCount} ${keyCount === 1 ? 'key' : 'keys'}`;
-  const nesting = depth <= 1 ? 'flat' : `${depth} levels`;
+  const nesting = depth <= 1 ? 'flat' : `${depth} levels deep`;
 
   return {
-    // The file name is already on the editor tab, so the header spends its
-    // width on the two numbers a conversion changes.
-    headerDetail: hasSelection ? `selection · ${keys} · ${nesting}` : `${keys} · ${nesting}`,
+    // The file name is already on the editor tab, so this spends its width on
+    // the two numbers a conversion changes.
+    headerDetail: hasSelection ? `Selection: ${keys} · ${nesting}` : `${keys} · ${nesting}`,
     shape: depth <= 1 ? 'flat' : 'nested'
   };
 }

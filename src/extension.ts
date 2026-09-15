@@ -45,14 +45,16 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 /**
- * Puts the shape of the active JSON beside the view's title, and any reason it
- * cannot be converted above the list.
+ * States what a conversion would act on, above the list of actions.
+ *
+ * `view.description` is not an option here: a container holding a single view
+ * hides that view's own title bar, so only the container title shows and the
+ * description never renders. `view.message` sits above the rows and does show.
  */
 function syncHeader(view: vscode.TreeView<Converter>, provider: ConverterTreeProvider): void {
   const summary = provider.currentSummary();
 
-  view.description = summary.headerDetail;
-  view.message = summary.problem;
+  view.message = summary.problem ?? summary.headerDetail;
 }
 
 export function deactivate(): void {

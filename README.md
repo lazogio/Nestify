@@ -30,7 +30,7 @@ Then pick whichever is closest to hand:
 - **Right-click** — **Nestify** → *Flatten JSON* / *Unflatten (Nest) JSON*.
 - **Command Palette** — `Cmd+Shift+P` / `Ctrl+Shift+P`, then type `Nestify`.
 - **Sidebar** — the Nestify icon in the Activity Bar lists every converter; click one to run it.
-  The header reports what would be converted — key count and nesting depth of the file or your
+  It states what would be converted — key count and nesting depth of the file or your
   selection — and a converter that would not help right now says why instead of offering itself.
 
 The converted text stays selected so you can see what changed. Invalid JSON changes
