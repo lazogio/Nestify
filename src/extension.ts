@@ -13,9 +13,10 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('nestify.flatten', () => applyConverter(requireConverter('flatten'))),
     vscode.commands.registerCommand('nestify.unflatten', () => applyConverter(requireConverter('unflatten'))),
     vscode.commands.registerCommand('nestify.convert', () => pickAndApplyConverter()),
-    // Invoked by the Activity Bar view, which passes the converter id.
-    vscode.commands.registerCommand('nestify.runConverter', (converterId: string) =>
-      runConverterById(converterId)
+    // Invoked by the Activity Bar view: a row click passes the converter id, the
+    // inline run button passes the row's converter itself.
+    vscode.commands.registerCommand('nestify.runConverter', (target: string | Converter) =>
+      runConverter(target)
     ),
     vscode.window.registerTreeDataProvider('nestify.converters', converterTree),
     converterTree
@@ -27,14 +28,20 @@ export function deactivate(): void {
 }
 
 /**
- * Runs a converter named by id. Reports a readable message instead of throwing
- * when the id is unknown, since the caller is a UI element rather than code.
+ * Runs a converter given either its id or the converter itself. Reports a
+ * readable message instead of throwing on an unknown id, since the caller is a
+ * UI element rather than code.
  */
-async function runConverterById(converterId: string): Promise<void> {
-  const converter = getConverter(converterId);
+async function runConverter(target: string | Converter): Promise<void> {
+  if (typeof target !== 'string') {
+    await applyConverter(target);
+    return;
+  }
+
+  const converter = getConverter(target);
 
   if (!converter) {
-    vscode.window.showErrorMessage(`Nestify: no converter registered for "${converterId}".`);
+    vscode.window.showErrorMessage(`Nestify: no converter registered for "${target}".`);
     return;
   }
 
