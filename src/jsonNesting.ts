@@ -15,8 +15,13 @@ export type FlatJson = Record<string, unknown>;
 
 const DEFAULT_SEPARATOR = '.';
 
-/** Path segments that would let a crafted payload reach Object.prototype. */
-const UNSAFE_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
+/**
+ * The one path segment that cannot be rebuilt: assigning to "__proto__" sets an
+ * object's prototype instead of recording a key. "constructor" and "prototype"
+ * were refused alongside it, but on a plain object they are ordinary
+ * own-property writes, so refusing them only blocked valid data.
+ */
+const UNSAFE_SEGMENT = '__proto__';
 
 function resolveSeparator(separator: string | undefined): string {
   const value = separator ?? DEFAULT_SEPARATOR;
@@ -44,7 +49,8 @@ function isContainer(value: unknown): value is Record<string, unknown> | unknown
  *
  * Two different paths can join to the same key when a key already contains the
  * separator — `{ "a.b": 1, "a": { "b": 2 } }` yields `"a.b"` twice. That is
- * refused rather than letting the second write bury the first.
+ * refused rather than letting the second write bury the first, as is any key
+ * `unflattenJson` could not take back: an empty segment, or `__proto__`.
  */
 export function flattenJson(input: unknown, options: NestingOptions = {}): FlatJson {
   const separator = resolveSeparator(options.separator);
@@ -57,10 +63,9 @@ export function flattenJson(input: unknown, options: NestingOptions = {}): FlatJ
 
   walk(input, [], into);
 
-  // Built in one go rather than assigned key by key: a plain `result[key] = …`
-  // with a key of "__proto__" sets the prototype instead of recording the key,
-  // which loses it. `Object.fromEntries` defines an own property either way,
-  // and a Map keeps the keys in the order they were met.
+  // `Object.fromEntries` defines each key as an own property whatever it is
+  // called, where a plain `result[key] = …` would treat some names as
+  // instructions; the Map keeps the keys in the order they were met.
   return Object.fromEntries([...into.leaves].map(([key, leaf]) => [key, leaf.value]));
 }
 
@@ -104,6 +109,9 @@ function assignLeaf(into: Flattening, path: string[], value: unknown): void {
   }
 
   const flatKey = path.join(into.separator);
+
+  rejectWhatCannotBeNestedBack(path, flatKey);
+
   const taken = into.leaves.get(flatKey);
 
   if (taken) {
@@ -115,6 +123,26 @@ function assignLeaf(into: Flattening, path: string[], value: unknown): void {
   }
 
   into.leaves.set(flatKey, { path, value });
+}
+
+/**
+ * Refuses a key that `unflattenJson` would not accept back, so the two
+ * directions agree by construction rather than by coincidence. Flattening such
+ * a key used to succeed and strand the data in its flat form.
+ */
+function rejectWhatCannotBeNestedBack(path: string[], flatKey: string): void {
+  if (path.includes(UNSAFE_SEGMENT)) {
+    throw new SyntaxError(
+      `Nestify: the key "${flatKey}" cannot be nested back — "${UNSAFE_SEGMENT}" is a reserved ` +
+        'path segment. Rename it, or convert a part of the file that does not contain it.'
+    );
+  }
+
+  if (path.some((segment) => segment.length === 0)) {
+    throw new SyntaxError(
+      `Nestify: the key "${flatKey}" cannot be nested back — one of its segments is empty.`
+    );
+  }
 }
 
 /** Names a path the way the source spells it, so both sides of a clash are readable. */
@@ -175,9 +203,8 @@ export function unflattenJson(input: unknown, options: NestingOptions = {}): Rec
       throw new SyntaxError(`Nestify: the key "${flatKey}" contains an empty path segment.`);
     }
 
-    const unsafe = segments.find((segment) => UNSAFE_SEGMENTS.has(segment));
-    if (unsafe !== undefined) {
-      throw new SyntaxError(`Nestify: the key "${flatKey}" uses the reserved path segment "${unsafe}".`);
+    if (segments.includes(UNSAFE_SEGMENT)) {
+      throw new SyntaxError(`Nestify: the key "${flatKey}" uses the reserved path segment "${UNSAFE_SEGMENT}".`);
     }
 
     let cursor = result;

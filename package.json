@@ -78,12 +78,6 @@
         }
       ]
     },
-    "viewsWelcome": [
-      {
-        "view": "nestify.converters",
-        "contents": "Open a JSON file, select the part you want to convert, then pick a converter above.\nNothing selected converts the whole file."
-      }
-    ],
     "submenus": [
       {
         "id": "nestify.submenu",
@@ -146,12 +140,12 @@
       "editor/title": [
         {
           "command": "nestify.flatten",
-          "when": "resourceLangId == json || resourceLangId == jsonc",
+          "when": "resourceLangId == json",
           "group": "navigation@10"
         },
         {
           "command": "nestify.unflatten",
-          "when": "resourceLangId == json || resourceLangId == jsonc",
+          "when": "resourceLangId == json",
           "group": "navigation@20"
         }
       ]

@@ -26,15 +26,19 @@ diff that is easier to read one line per key.
 Select the JSON you want to convert, or select nothing to convert the whole file.
 Then pick whichever is closest to hand:
 
-- **Toolbar** — on a `.json` or `.jsonc` file, two buttons sit top-right of the editor: flatten and nest.
+- **Toolbar** — on a `.json` file, two buttons sit top-right of the editor: flatten and nest.
 - **Right-click** — **Nestify** → *Flatten JSON* / *Unflatten (Nest) JSON*.
 - **Command Palette** — `Cmd+Shift+P` / `Ctrl+Shift+P`, then type `Nestify`.
 - **Sidebar** — the Nestify icon in the Activity Bar lists every converter; click one to run it.
   It states what would be converted — key count and nesting depth of the file or your
   selection — and a converter that would not help right now says why instead of offering itself.
 
-The converted text stays selected so you can see what changed. Invalid JSON changes
-nothing and tells you what is wrong.
+Converting a selection leaves it selected, so you can see what changed; converting a
+whole file puts the cursor at the top of it. Invalid JSON changes nothing and tells
+you what is wrong.
+
+JSON with comments is not supported: the conversion is written back with
+`JSON.stringify`, which would drop every comment in the file.
 
 No shortcuts are bundled, so nothing of yours is overridden. To add your own, bind
 `nestify.flatten` or `nestify.unflatten` in **Keyboard Shortcuts**.
@@ -55,10 +59,11 @@ becomes `{ "tags.0": "a" }`. Nesting it back produces `{ "tags": { "0": "a" } }`
 object, not an array. This is deliberate: it keeps gaps and out-of-order numeric keys
 intact. If you round-trip arrays, expect objects on the way back.
 
-Keys that clash, contain an empty segment, or use a reserved name such as `__proto__`
-are refused, and the message names the key at fault. That includes flattening a file
-where a literal `"a.b"` sits next to a nested `"a": { "b": … }` — both would become the
-same key, so Nestify says so instead of keeping one of the two.
+Keys that clash, contain an empty segment, or use the reserved name `__proto__` are
+refused in both directions, and the message names the key at fault. That includes
+flattening a file where a literal `"a.b"` sits next to a nested `"a": { "b": … }` —
+both would become the same key, so Nestify says so instead of keeping one of the two.
+Whatever flattens can be nested back.
 
 ## Contributing
 

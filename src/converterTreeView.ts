@@ -87,16 +87,14 @@ export class ConverterTreeProvider implements vscode.TreeDataProvider<Converter>
  * error notification.
  */
 function reasonToSkip(converterId: string, summary: ActiveJsonSummary): string | undefined {
-  if (!summary.shape) {
-    return undefined;
-  }
-
   if (converterId === 'flatten' && summary.shape === 'flat') {
     return 'already flat';
   }
 
-  if (converterId === 'unflatten' && summary.shape === 'nested') {
-    return 'needs flat keys';
+  // Asked of the keys themselves, not of the depth: a nested file can still
+  // hold a joined key, and nesting it works, so the row must not refuse it.
+  if (converterId === 'unflatten' && summary.joinedKeys === false) {
+    return 'no joined keys';
   }
 
   return undefined;
@@ -129,7 +127,7 @@ function tooltipFor(converter: Converter, blocked: string | undefined): vscode.M
 
 const explanations: Record<string, string> = {
   flatten: 'This JSON has no nesting left to flatten.',
-  unflatten: 'This JSON is nested already — nesting expects keys joined by the separator.'
+  unflatten: 'No key here is a joined path — nesting expects keys such as "app.name".'
 };
 
 const examples: Record<string, string> = {
