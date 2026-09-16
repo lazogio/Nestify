@@ -3,7 +3,7 @@ import { ConversionTarget, conversionTarget, targetEditor, trackActiveEditor } f
 import { ConversionError } from './converters/jsonSource';
 import { Converter, getConverter, listConverters, requireConverter } from './converters/registry';
 import { ConverterTreeProvider } from './converterTreeView';
-import { SeparatorConflictError } from './jsonNesting';
+import { suggestedSeparator } from './jsonNesting';
 import { writeSeparator } from './settings';
 
 // Imported for the side effect: the module registers the JSON converters.
@@ -218,9 +218,10 @@ function convert(
  * Reports a failed conversion, and offers a separator that would work when the
  * file refused the current one.
  *
- * A key holding the separator is the one refusal the user cannot act on without
- * knowing which character the whole file leaves free, which is why it is worth
- * a button rather than the advice to go and look.
+ * Both directions refuse over the separator, and neither can be acted on
+ * without reading the whole file: flattening wants a character no key contains,
+ * nesting the one the keys are already joined with. Either is worth a button
+ * rather than the advice to go and look.
  */
 async function reportFailure(
   target: ConversionTarget,
@@ -228,7 +229,7 @@ async function reportFailure(
   retry: () => Promise<void>
 ): Promise<void> {
   const message = reportable(error);
-  const suggestion = error instanceof SeparatorConflictError ? error.suggestion : undefined;
+  const suggestion = suggestedSeparator(error);
 
   if (suggestion === undefined) {
     await vscode.window.showErrorMessage(message);
