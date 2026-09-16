@@ -123,6 +123,35 @@ function describePath(path: string[]): string {
 }
 
 /**
+ * 1 for a flat object, 2 once a value is itself a populated object, and so on.
+ *
+ * An empty object or array counts as a leaf, not a level, because that is how
+ * `flattenJson` treats it. Counting it as a level made a visibly flat file
+ * report "2 levels deep" over a single `[]`.
+ */
+export function depthOf(value: unknown): number {
+  if (!isContainer(value)) {
+    return 0;
+  }
+
+  const children = Object.values(value as Record<string, unknown>);
+
+  if (children.length === 0) {
+    return 0;
+  }
+
+  // A loop rather than `Math.max(...children.map(depthOf))`: spreading passes
+  // one argument per child, and a file with enough of them overflows the stack.
+  let deepest = 0;
+
+  for (const child of children) {
+    deepest = Math.max(deepest, depthOf(child));
+  }
+
+  return 1 + deepest;
+}
+
+/**
  * Rebuilds a nested structure from a flat map of `separator`-joined keys.
  *
  * Numeric path segments are treated as ordinary object keys, never as array
@@ -155,7 +184,12 @@ export function unflattenJson(input: unknown, options: NestingOptions = {}): Rec
 
     for (let i = 0; i < segments.length - 1; i++) {
       const segment = segments[i];
-      const existing = cursor[segment];
+      // An own-property lookup: a plain `cursor[segment]` also finds inherited
+      // members, so a key called "toString" or "valueOf" read as an existing
+      // value and the whole document was refused.
+      const existing = Object.prototype.hasOwnProperty.call(cursor, segment)
+        ? cursor[segment]
+        : undefined;
 
       if (existing === undefined) {
         const child: Record<string, unknown> = {};

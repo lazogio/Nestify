@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { targetEditor } from './activeEditor';
-import { flattenJson } from './jsonNesting';
+import { depthOf, flattenJson } from './jsonNesting';
 
 /** What the view knows about the text a conversion would run on. */
 export interface ActiveJsonSummary {
@@ -54,16 +54,25 @@ export function summariseActiveJson(): ActiveJsonSummary {
 
   const separator = vscode.workspace.getConfiguration('nestify').get<string>('separator', '.') || '.';
   let keyCount: number;
+  let depth: number;
 
   try {
     keyCount = Object.keys(flattenJson(parsed, { separator })).length;
+    depth = depthOf(parsed);
   } catch (error) {
     // Valid JSON that still cannot be flattened, such as two keys that join to
     // the same path. Saying so here beats a count the conversion would refuse.
-    return { problem: asSentence(error) };
+    if (error instanceof Error && error.message.startsWith('Nestify: ')) {
+      return { problem: asSentence(error) };
+    }
+
+    // Something the measurement itself could not carry, such as nesting deep
+    // enough to exhaust the stack. A conversion may still work, so the view
+    // says only that it cannot measure instead of standing in the way. This
+    // runs on every keystroke, so it must never throw into the event loop.
+    return { headerDetail: `${scope} · too large to measure` };
   }
 
-  const depth = depthOf(parsed);
   const keys = `${keyCount} ${keyCount === 1 ? 'key' : 'keys'}`;
   const nesting = depth <= 1 ? 'flat' : `${depth} levels deep`;
 
@@ -76,32 +85,7 @@ export function summariseActiveJson(): ActiveJsonSummary {
 }
 
 /** Turns a thrown Nestify error into prose the view can show above the list. */
-function asSentence(error: unknown): string {
-  if (!(error instanceof Error)) {
-    return 'This JSON cannot be flattened.';
-  }
-
+function asSentence(error: Error): string {
   const message = error.message.replace(/^Nestify: /, '');
   return message.charAt(0).toUpperCase() + message.slice(1);
-}
-
-/**
- * 1 for a flat object, 2 once a value is itself a populated object, and so on.
- *
- * An empty object or array counts as a leaf, not a level, because that is how
- * `flattenJson` treats it. Counting it as a level made a visibly flat file
- * report "2 levels deep" over a single `[]`.
- */
-function depthOf(value: unknown): number {
-  if (typeof value !== 'object' || value === null) {
-    return 0;
-  }
-
-  const children = Object.values(value as Record<string, unknown>);
-
-  if (children.length === 0) {
-    return 0;
-  }
-
-  return 1 + Math.max(0, ...children.map(depthOf));
 }
