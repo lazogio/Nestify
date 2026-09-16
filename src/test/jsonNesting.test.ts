@@ -95,14 +95,32 @@ describe('flattenJson', () => {
     });
   });
 
-  it('records a "__proto__" key as data rather than setting the prototype', () => {
-    // JSON.parse is how the extension gets here, and it makes "__proto__" an
-    // ordinary own key — unlike an object literal, which sets the prototype.
-    const flat = flattenJson(JSON.parse('{"__proto__": {"polluted": true}}'));
+  describe('keys that could not be nested back', () => {
+    it('refuses a "__proto__" key instead of stranding it in flat form', () => {
+      // JSON.parse is how the extension gets here, and it makes "__proto__" an
+      // ordinary own key — unlike an object literal, which sets the prototype.
+      const message = messageFrom(() => flattenJson(JSON.parse('{"__proto__": {"polluted": true}}')));
 
-    assert.deepEqual(Object.keys(flat), ['__proto__.polluted']);
-    assert.equal(flat['__proto__.polluted'], true);
-    assert.equal(({} as Record<string, unknown>).polluted, undefined);
+      assert.match(message, /__proto__/);
+      assert.match(message, /cannot be nested back/);
+      assert.equal(({} as Record<string, unknown>).polluted, undefined);
+    });
+
+    it('refuses one deeper in the path too', () => {
+      assert.throws(() => flattenJson(JSON.parse('{"a": {"__proto__": {"b": 1}}}')), SyntaxError);
+    });
+
+    it('refuses an empty key segment', () => {
+      const message = messageFrom(() => flattenJson(JSON.parse('{"": {"a": 1}}')));
+
+      assert.match(message, /segments is empty/);
+    });
+
+    it('carries "constructor" and "prototype", which are ordinary keys', () => {
+      assert.deepEqual(flattenJson(JSON.parse('{"constructor": {"name": "Widget"}}')), {
+        'constructor.name': 'Widget'
+      });
+    });
   });
 
   it('survives JSON.stringify, which is how the extension writes it back', () => {
@@ -132,10 +150,14 @@ describe('unflattenJson', () => {
     assert.throws(() => unflattenJson({ 'a..b': 1 }), SyntaxError);
   });
 
-  it('refuses a reserved path segment', () => {
-    for (const key of ['__proto__.x', 'a.constructor', 'a.prototype.b']) {
-      assert.throws(() => unflattenJson({ [key]: 1 }), SyntaxError);
-    }
+  it('refuses the one reserved path segment', () => {
+    assert.throws(() => unflattenJson({ ['__proto__.x']: 1 }), SyntaxError);
+    assert.throws(() => unflattenJson({ ['a.__proto__.b']: 1 }), SyntaxError);
+  });
+
+  it('rebuilds "constructor" and "prototype" like any other key', () => {
+    assert.deepEqual(unflattenJson({ ['a.constructor']: 1 }), { a: { constructor: 1 } });
+    assert.deepEqual(unflattenJson({ ['prototype.b']: 1 }), { prototype: { b: 1 } });
   });
 
   describe('keys that share a name with an Object.prototype member', () => {
@@ -212,6 +234,12 @@ describe('depthOf', () => {
 describe('round trips', () => {
   it('returns objects unchanged when they hold no arrays', () => {
     const original = { app: { name: 'nestify', window: { width: 800 } }, debug: false };
+
+    assert.deepEqual(unflattenJson(flattenJson(original)), original);
+  });
+
+  it('returns a document whose keys are named after built-ins unchanged', () => {
+    const original = JSON.parse('{"constructor": {"name": "Widget"}, "prototype": {"x": 1}}');
 
     assert.deepEqual(unflattenJson(flattenJson(original)), original);
   });

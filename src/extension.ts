@@ -111,6 +111,16 @@ async function pickAndApplyConverter(): Promise<void> {
   }
 }
 
+/**
+ * A message to show the user. Converters throw errors that already name
+ * Nestify, so prefixing unconditionally read "Nestify: Nestify: …".
+ */
+function reportable(error: unknown): string {
+  const reason = error instanceof Error ? error.message : String(error);
+
+  return reason.startsWith('Nestify: ') ? reason : `Nestify: ${reason}`;
+}
+
 async function applyConverter(converter: Converter): Promise<void> {
   const editor = targetEditor();
 
@@ -132,12 +142,22 @@ async function applyConverter(converter: Converter): Promise<void> {
   try {
     converted = converter.run(document.getText(range));
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    vscode.window.showErrorMessage(`Nestify: ${reason}`);
+    vscode.window.showErrorMessage(reportable(error));
     return;
   }
 
-  const applied = await editor.edit((editBuilder) => editBuilder.replace(range, converted));
+  let applied: boolean;
+
+  // The edit can fail as well as decline: the document may have been closed
+  // between clicking a row in the sidebar and the edit reaching it. Left
+  // unhandled that surfaces as a generic "command failed" instead of saying
+  // what happened.
+  try {
+    applied = await editor.edit((editBuilder) => editBuilder.replace(range, converted));
+  } catch (error) {
+    vscode.window.showErrorMessage(reportable(error));
+    return;
+  }
 
   if (!applied) {
     vscode.window.showErrorMessage('Nestify: the editor rejected the edit, nothing was changed.');

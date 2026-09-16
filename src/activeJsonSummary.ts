@@ -10,6 +10,12 @@ export interface ActiveJsonSummary {
   readonly problem?: string;
   /** Whether that text is already flat, nested, or unknown. */
   readonly shape?: 'flat' | 'nested';
+  /**
+   * Whether any key is a joined path, i.e. whether nesting has anything to do.
+   * Depth cannot answer this: `{ "a.b": 1, "c": { "d": 2 } }` is nested and
+   * still has a key to nest.
+   */
+  readonly joinedKeys?: boolean;
 }
 
 // Parsing runs on every keystroke in the active file, so skip pathological sizes.
@@ -80,8 +86,21 @@ export function summariseActiveJson(): ActiveJsonSummary {
     // The file name is already on the editor tab, so this spends its width on
     // the two numbers a conversion changes.
     headerDetail: hasSelection ? `Selection: ${keys} · ${nesting}` : `${keys} · ${nesting}`,
-    shape: depth <= 1 ? 'flat' : 'nested'
+    shape: depth <= 1 ? 'flat' : 'nested',
+    joinedKeys: hasJoinedKeys(parsed, separator)
   };
+}
+
+/**
+ * Whether nesting would find a key to split. An array has index keys only, and
+ * `unflattenJson` refuses an array at the top level anyway.
+ */
+function hasJoinedKeys(parsed: object, separator: string): boolean {
+  if (Array.isArray(parsed)) {
+    return false;
+  }
+
+  return Object.keys(parsed).some((key) => key.includes(separator));
 }
 
 /** Turns a thrown Nestify error into prose the view can show above the list. */

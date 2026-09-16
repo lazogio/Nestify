@@ -16,6 +16,26 @@ All notable changes to Nestify are documented in this file.
 - Nesting a key named after a built-in, such as `toString` or `valueOf`, no
   longer fails with a conflict that was not there.
 
+- Flattening now refuses any key that nesting could not take back — an empty
+  segment, or `__proto__` — instead of producing one that is stuck in flat form.
+- `constructor` and `prototype` are ordinary keys again. They were refused along
+  with `__proto__`, but on a plain object they cannot reach the prototype, so
+  refusing them only blocked valid documents such as `{ "constructor": { … } }`.
+- Error notifications no longer read `Nestify: Nestify: …`.
+- An edit the editor rejects outright now says so, instead of surfacing as a
+  generic command failure.
+- The nest row in the Activity Bar asks whether any key is a joined path rather
+  than how deep the file is, so `{ "a.b": 1, "c": { "d": 2 } }` is no longer
+  marked unusable when nesting it works.
+
+### Changed
+
+- The toolbar buttons no longer appear on JSON-with-comments files. The result
+  is written back with `JSON.stringify`, which would drop every comment, so the
+  buttons offered something that could not work.
+- Removed the Activity Bar welcome text, which could never render: the view
+  always lists the registered converters.
+
 ### Added
 
 - Unit tests for `flattenJson` / `unflattenJson`, run with `npm test`.
