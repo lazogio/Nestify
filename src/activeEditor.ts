@@ -34,3 +34,34 @@ export function targetEditor(): vscode.TextEditor | undefined {
 
   return undefined;
 }
+
+/** The text a conversion reads, and where it sits. */
+export interface ConversionTarget {
+  readonly editor: vscode.TextEditor;
+  readonly range: vscode.Range;
+  readonly hadSelection: boolean;
+}
+
+/**
+ * The selection, or the whole document when nothing is selected.
+ *
+ * Both the commands and the Activity Bar header ask this, so that the header
+ * cannot describe something a conversion would not act on.
+ */
+export function conversionTarget(): ConversionTarget | undefined {
+  const editor = targetEditor();
+
+  if (!editor) {
+    return undefined;
+  }
+
+  const hadSelection = !editor.selection.isEmpty;
+
+  // Built from the line count rather than from `getText().length`, which would
+  // copy the whole document just to measure it.
+  const range = hadSelection
+    ? new vscode.Range(editor.selection.start, editor.selection.end)
+    : editor.document.validateRange(new vscode.Range(0, 0, editor.document.lineCount, 0));
+
+  return { editor, range, hadSelection };
+}

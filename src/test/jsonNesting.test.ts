@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { depthOf, flattenJson, sortKeysDeep, unflattenJson } from '../jsonNesting';
+import { countFlatKeys, depthOf, flattenJson, sortKeysDeep, unflattenJson } from '../jsonNesting';
 
 /** The thrown message, so a test can assert on what the user would read. */
 function messageFrom(run: () => unknown): string {
@@ -288,6 +288,28 @@ describe('depthOf', () => {
     // A spread of one argument per child overflowed the stack here, which threw
     // out of the view's refresh — on a file well under the size it will measure.
     assert.equal(depthOf({ items: new Array(200_000).fill(0) }), 2);
+  });
+});
+
+describe('countFlatKeys', () => {
+  it('counts what flattening would write', () => {
+    const document = { app: { name: 'nestify', tags: ['a', 'b'] }, empty: {} };
+
+    assert.equal(countFlatKeys(document), Object.keys(flattenJson(document)).length);
+    assert.equal(countFlatKeys(document), 4);
+  });
+
+  it('counts nothing for a wholly empty document', () => {
+    assert.equal(countFlatKeys({}), 0);
+  });
+
+  it('honours the separator, which decides what clashes', () => {
+    assert.equal(countFlatKeys({ 'a.b': 1, a: { b: 2 } }, { separator: '/' }), 2);
+  });
+
+  it('refuses whatever flattening would refuse', () => {
+    assert.throws(() => countFlatKeys(JSON.parse('{"a.b": 1}')), SyntaxError);
+    assert.throws(() => countFlatKeys('nope'), TypeError);
   });
 });
 

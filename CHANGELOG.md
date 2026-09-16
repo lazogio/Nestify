@@ -38,6 +38,11 @@ All notable changes to Nestify are documented in this file.
   than how deep the file is, so `{ "a.b": 1, "c": { "d": 2 } }` is no longer
   marked unusable when nesting it works.
 
+- Settings are read for the file being converted, so a folder-level or
+  language-level `nestify.separator` is honoured instead of the window's value —
+  and the sidebar and the conversion now read it through the same code, so they
+  cannot disagree.
+
 ### Changed
 
 - The toolbar buttons no longer appear on JSON-with-comments files. The result

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { targetEditor, trackActiveEditor } from './activeEditor';
+import { ConversionTarget, conversionTarget, targetEditor, trackActiveEditor } from './activeEditor';
 import { ConversionError } from './converters/jsonSource';
 import { Converter, getConverter, listConverters, requireConverter } from './converters/registry';
 import { ConverterTreeProvider } from './converterTreeView';
@@ -129,7 +129,7 @@ async function copyConverted(target?: unknown): Promise<void> {
   }
 
   const converter = named;
-  const where = conversionTarget();
+  const where = targetOrComplain();
 
   if (!where) {
     return;
@@ -174,30 +174,15 @@ function isConverter(value: unknown): value is Converter {
   );
 }
 
-/** The text a conversion reads, and where it sits. */
-interface ConversionTarget {
-  readonly editor: vscode.TextEditor;
-  readonly range: vscode.Range;
-  readonly hadSelection: boolean;
-}
+/** The target, or a message when there is no file to convert. */
+function targetOrComplain(): ConversionTarget | undefined {
+  const target = conversionTarget();
 
-/** The selection, or the whole document when nothing is selected. */
-function conversionTarget(): ConversionTarget | undefined {
-  const editor = targetEditor();
-
-  if (!editor) {
+  if (!target) {
     vscode.window.showErrorMessage('Nestify: open a file first.');
-    return undefined;
   }
 
-  const document = editor.document;
-  const hadSelection = !editor.selection.isEmpty;
-
-  const range = hadSelection
-    ? new vscode.Range(editor.selection.start, editor.selection.end)
-    : new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length));
-
-  return { editor, range, hadSelection };
+  return target;
 }
 
 /**
@@ -206,7 +191,11 @@ function conversionTarget(): ConversionTarget | undefined {
  */
 function convert(converter: Converter, target: ConversionTarget): string | undefined {
   try {
-    return converter.run(target.editor.document.getText(target.range));
+    // The document travels with the text, so settings a folder or a language
+    // overrides are read for the file being converted.
+    return converter.run(target.editor.document.getText(target.range), {
+      resource: target.editor.document.uri
+    });
   } catch (error) {
     vscode.window.showErrorMessage(reportable(error));
     revealProblem(target, error);
@@ -246,7 +235,7 @@ function reportable(error: unknown): string {
 }
 
 async function applyConverter(converter: Converter): Promise<void> {
-  const target = conversionTarget();
+  const target = targetOrComplain();
 
   if (!target) {
     return;

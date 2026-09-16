@@ -16,6 +16,7 @@ Press `F5` in VS Code to launch an Extension Development Host with Nestify loade
 images/icon.svg                    icon source; icon.png is the rasterised 128×128
 src/
   extension.ts                     activate(): wires the commands to the registry
+  settings.ts                      readSettings(resource): the one reader of nestify.*
   jsonNesting.ts                   pure flattenJson() / unflattenJson() / depthOf(), no vscode import
   converters/
     registry.ts                    Converter registry (id, title, run)
@@ -43,11 +44,23 @@ import { registerConverter } from './registry';
 registerConverter({
   id: 'json-to-yaml',
   title: 'JSON to YAML',
-  run(sourceText: string): string {
+  shortTitle: 'To YAML',
+  hint: '{a:{b}} → a:\\n  b',
+  icon: 'symbol-namespace',        // codicon id for the Activity Bar row
+  example: '// before\\n{ "a": 1 }\\n\\n// after\\na: 1',
+  skipReason(summary) {            // optional: why it would not help right now
+    return summary.shape ? undefined : 'no JSON here';
+  },
+  run(sourceText: string, context): string {
     return toYaml(JSON.parse(sourceText)); // throw an Error to surface a message
   }
 });
 ```
+
+Everything the Activity Bar shows for a row — its icon, its example, and why it
+would not help right now — comes off the converter, so adding one touches no other
+file. `context.resource` is the document the text came from; pass it to
+`readSettings()` if your converter reads settings, so a folder-level override wins.
 
 Import the module for its side effect in `src/extension.ts` and it shows up in
 `Nestify: Convert With…` straight away. Add a dedicated command in `package.json` only
