@@ -46,8 +46,9 @@ The layering exists so the conversion logic is testable without VS Code — keep
   module side effect.
 - `src/extension.ts` — `activate()` wires commands to the registry and imports
   converter modules for their side effect. It knows no format details.
-- `src/settings.ts` — `readSettings(resource)` is the **only** reader of `nestify.*`.
-  Always pass the document URI so a folder- or language-level override wins.
+- `src/settings.ts` — `readSettings(resource)` is the **only** reader of `nestify.*`,
+  and `writeSeparator()` its only writer. Always pass the document URI so a folder- or
+  language-level override wins.
 - `src/activeEditor.ts` — `conversionTarget()` returns the selection, or the whole
   document when nothing is selected. It also remembers the last active editor,
   because `window.activeTextEditor` is undefined while the sidebar view holds focus.
