@@ -2,7 +2,7 @@
 
 All notable changes to Nestify are documented in this file.
 
-## [0.0.4] - Unreleased
+## [0.0.4] - 2026-09-16
 
 ### Fixed
 
