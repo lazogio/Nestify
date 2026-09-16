@@ -16,8 +16,18 @@ All notable changes to Nestify are documented in this file.
 - Nesting a key named after a built-in, such as `toString` or `valueOf`, no
   longer fails with a conflict that was not there.
 
-- Flattening now refuses any key that nesting could not take back — an empty
-  segment, or `__proto__` — instead of producing one that is stuck in flat form.
+- Flattening now refuses any key that nesting could not take back — one that
+  already contains the separator, an empty segment, or `__proto__` — instead of
+  quietly reshaping the document. `{ "a.b": 1, "a": { "c": 2 } }` used to flatten
+  to `{ "a.b": 1, "a.c": 2 }` and nest back as `{ "a": { "b": 1, "c": 2 } }`.
+- Nesting no longer writes into a value the flat document supplied, which merged
+  keys into data that was not Nestify's to reshape and mutated the object it was
+  given. `{ "a": { "b": 1 }, "a.c": 2 }` is reported as the conflict it is.
+- A failed conversion no longer clears the selection while pointing at the bad
+  character, which made the next run convert the whole file instead of the
+  fragment that was selected.
+- `Copy Converted…` works from the editor's context menu, which forwards the
+  file's URI where the command expected a converter.
 - `constructor` and `prototype` are ordinary keys again. They were refused along
   with `__proto__`, but on a plain object they cannot reach the prototype, so
   refusing them only blocked valid documents such as `{ "constructor": { … } }`.

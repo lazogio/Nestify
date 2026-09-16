@@ -23,6 +23,12 @@ jobs:
     permissions:
       contents: write
 
+    # Read from the environment rather than passed as arguments, where a token
+    # would be visible in the runner's process list.
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+
     steps:
       - name: Check out the repository
         uses: actions/checkout@v5
@@ -37,10 +43,12 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm install
+        # Not `npm install`: it can rewrite package-lock.json, and the version
+        # bump below refuses to run with a dirty working tree.
+        run: npm ci
 
-      - name: Compile
-        run: npm run compile
+      - name: Compile and run the tests
+        run: npm test
 
       - name: Require a changelog entry for the version being released
         run: |
@@ -66,7 +74,7 @@ jobs:
       # vsce raises the version, commits it, tags it, then publishes in one step.
       - name: Raise the version and publish
         if: github.event_name == 'workflow_dispatch'
-        run: npx --yes @vscode/vsce publish ${{ inputs.bump }} --pat ${{ secrets.VSCE_PAT }}
+        run: npx --yes @vscode/vsce publish ${{ inputs.bump }}
 
       - name: Push the version bump and its tag
         if: github.event_name == 'workflow_dispatch'
@@ -74,8 +82,11 @@ jobs:
 
       - name: Publish the tagged version
         if: github.event_name == 'push'
-        run: npx --yes @vscode/vsce publish --pat ${{ secrets.VSCE_PAT }}
+        run: npx --yes @vscode/vsce publish
 
       - name: Publish to Open VSX
+        # Skipped outright without the secret. Passing an empty --pat made the
+        # step fail every release instead.
+        if: env.OVSX_PAT != ''
         continue-on-error: true
-        run: npx --yes ovsx publish --pat ${{ secrets.OVSX_PAT }}
+        run: npx --yes ovsx publish

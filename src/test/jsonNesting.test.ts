@@ -55,32 +55,22 @@ describe('flattenJson', () => {
     assert.throws(() => flattenJson({ a: 1 }, { separator: '' }), TypeError);
   });
 
-  describe('keys that join to the same path', () => {
-    it('refuses a literal dotted key that collides with a nested one', () => {
-      const message = messageFrom(() => flattenJson({ 'a.b': 1, a: { b: 2 } }));
+  describe('keys that already contain the separator', () => {
+    it('refuses one, since nesting would read it as a path', () => {
+      const message = messageFrom(() => flattenJson(JSON.parse('{"a.b": 1}')));
 
-      assert.match(message, /"a\.b"/);
-      assert.match(message, /twice/);
+      assert.match(message, /"a\.b" already contains the separator "\."/);
+      assert.match(message, /could not be nested back/);
     });
 
-    it('refuses the collision whichever key comes first', () => {
-      assert.throws(() => flattenJson({ a: { b: 2 }, 'a.b': 1 }), SyntaxError);
+    it('refuses one nested inside the document', () => {
+      // Flattening this produced "app.v1.2.x", which nested back as four levels
+      // rather than the three that were written.
+      assert.throws(() => flattenJson(JSON.parse('{"app": {"v1.2": {"x": 1}}}')), SyntaxError);
     });
 
-    it('names both paths, so it is clear which keys clash', () => {
-      const message = messageFrom(() => flattenJson({ 'a.b': 1, a: { b: 2 } }));
-
-      // The literal key stands alone; the nested one is spelled out segment by
-      // segment, so the two sides of the clash can be told apart.
-      assert.match(message, /"a\.b" and "a" → "b"/);
-    });
-
-    it('spots a collision between an array index and a literal key', () => {
-      assert.throws(() => flattenJson({ 'tags.0': 'x', tags: ['y'] }), SyntaxError);
-    });
-
-    it('spots a collision an empty container would cause', () => {
-      assert.throws(() => flattenJson({ 'a.b': 1, a: { b: {} } }), SyntaxError);
+    it('refuses the pair that would have collided', () => {
+      assert.throws(() => flattenJson(JSON.parse('{"a.b": 1, "a": {"b": 2}}')), SyntaxError);
     });
 
     it('allows the same keys once the separator no longer occurs in them', () => {
@@ -90,8 +80,30 @@ describe('flattenJson', () => {
       });
     });
 
-    it('leaves keys that merely look similar alone', () => {
-      assert.deepEqual(flattenJson({ 'a.b': 1, a: { c: 2 } }), { 'a.b': 1, 'a.c': 2 });
+    it('leaves an ordinary document alone', () => {
+      assert.deepEqual(flattenJson({ app: { name: 'nestify' } }), { 'app.name': 'nestify' });
+    });
+  });
+
+  describe('two paths that join to the same key', () => {
+    // A separator of more than one character can be split across two segments
+    // that neither of them contains, which the check above cannot see.
+    const separator = '..';
+
+    it('refuses the second path, naming both', () => {
+      const message = messageFrom(() =>
+        flattenJson(JSON.parse('{"a.": {"b": 1}, "a": {".b": 2}}'), { separator })
+      );
+
+      assert.match(message, /"a\.\.\.b" would be written twice/);
+      assert.match(message, /"a\." → "b" and "a" → "\.b"/);
+    });
+
+    it('refuses it whichever side comes first', () => {
+      assert.throws(
+        () => flattenJson(JSON.parse('{"a": {".b": 2}, "a.": {"b": 1}}'), { separator }),
+        SyntaxError
+      );
     });
   });
 
@@ -215,6 +227,24 @@ describe('unflattenJson', () => {
 
     assert.match(message, /"a\.b"/);
     assert.match(message, /already a value/);
+  });
+
+  it('refuses to merge into a value that is itself an object', () => {
+    // It used to descend into it, so the key landed inside data the document
+    // supplied — and the caller's own object was rewritten in the process.
+    const input = JSON.parse('{"a": {"b": 1}, "a.c": 2}');
+
+    assert.throws(() => unflattenJson(input), SyntaxError);
+    assert.deepEqual(input, { a: { b: 1 }, 'a.c': 2 });
+  });
+
+  it('leaves the object it was given untouched', () => {
+    const input = { 'a.b': 1, 'a.c': 2 };
+    const before = JSON.parse(JSON.stringify(input));
+
+    unflattenJson(input);
+
+    assert.deepEqual(input, before);
   });
 
   it('refuses a key already built as a parent of another', () => {

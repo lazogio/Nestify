@@ -56,7 +56,8 @@ function isContainer(value: unknown): value is Record<string, unknown> | unknown
  * Two different paths can join to the same key when a key already contains the
  * separator — `{ "a.b": 1, "a": { "b": 2 } }` yields `"a.b"` twice. That is
  * refused rather than letting the second write bury the first, as is any key
- * `unflattenJson` could not take back: an empty segment, or `__proto__`.
+ * `unflattenJson` could not take back: one that already contains the separator,
+ * an empty segment, or `__proto__`.
  */
 export function flattenJson(input: unknown, options: NestingOptions = {}): FlatJson {
   const separator = resolveSeparator(options.separator);
@@ -116,10 +117,13 @@ function assignLeaf(into: Flattening, path: string[], value: unknown): void {
 
   const flatKey = path.join(into.separator);
 
-  rejectWhatCannotBeNestedBack(path, flatKey);
+  rejectWhatCannotBeNestedBack(path, flatKey, into.separator);
 
   const taken = into.leaves.get(flatKey);
 
+  // Still reachable past the check above: with a separator of "..", the paths
+  // ["a.", "b"] and ["a", ".b"] both join to "a...b" without either segment
+  // containing "..".
   if (taken) {
     throw new SyntaxError(
       `Nestify: the key "${flatKey}" would be written twice — ${describePath(taken.path)} and ` +
@@ -136,7 +140,20 @@ function assignLeaf(into: Flattening, path: string[], value: unknown): void {
  * directions agree by construction rather than by coincidence. Flattening such
  * a key used to succeed and strand the data in its flat form.
  */
-function rejectWhatCannotBeNestedBack(path: string[], flatKey: string): void {
+function rejectWhatCannotBeNestedBack(path: string[], flatKey: string, separator: string): void {
+  // A key that already holds the separator is indistinguishable from a path
+  // once joined, so nesting would read it as one and quietly reshape the
+  // document — `{ "a.b": 1, "a": { "c": 2 } }` came back as `{ a: { b, c } }`.
+  const joined = path.find((segment) => segment.includes(separator));
+
+  if (joined !== undefined) {
+    throw new SyntaxError(
+      `Nestify: the key "${joined}" already contains the separator "${separator}", so ` +
+        'flattening it would read as a path and could not be nested back. Set the ' +
+        'separator to a character your keys do not contain.'
+    );
+  }
+
   if (path.includes(UNSAFE_SEGMENT)) {
     throw new SyntaxError(
       `Nestify: the key "${flatKey}" cannot be nested back — "${UNSAFE_SEGMENT}" is a reserved ` +
@@ -239,7 +256,10 @@ export function unflattenJson(
         continue;
       }
 
-      if (!isPlainObject(existing)) {
+      // `built` is what tells a container this call made from a value the
+      // document supplied. Writing into the latter would both merge keys into
+      // data that is not ours to reshape and mutate the caller's input.
+      if (!isPlainObject(existing) || !built.has(existing)) {
         throw new SyntaxError(
           `Nestify: the key "${flatKey}" conflicts with an earlier key — ` +
             `"${segments.slice(0, i + 1).join(separator)}" is already a value.`
