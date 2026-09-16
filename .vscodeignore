@@ -12,3 +12,4 @@ package-lock.json
 **/*.ts
 .claude/**
 CONTRIBUTING.md
+CLAUDE.md
