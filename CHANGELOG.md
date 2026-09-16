@@ -2,6 +2,18 @@
 
 All notable changes to Nestify are documented in this file.
 
+## [0.0.6] - 2026-09-16
+
+### Added
+
+- Nesting refused over a key conflict now names the separator the keys are
+  actually joined with and offers to set it, the way flattening already did.
+  A .NET `appsettings.json` — paths joined with `:`, last segment a namespace
+  full of dots — refused under `.` with nothing to act on; it now offers `:`,
+  under which it nests cleanly. The offer is made only after nesting the whole
+  document with the candidate, and only for a separator the keys contain, since
+  one they do not contain would nest nothing.
+
 ## [0.0.5] - 2026-09-16
 
 ### Added

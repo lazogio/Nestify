@@ -57,6 +57,35 @@ export class SeparatorConflictError extends SyntaxError {
   }
 }
 
+/**
+ * Nesting refused because the keys do not split into paths under the current
+ * separator: two of them disagree about what is a container and what is a
+ * value.
+ *
+ * Like its flattening counterpart it carries a separator that would work, when
+ * the document has one — a file whose keys are joined with ":" and whose last
+ * segment holds dots, which is every .NET `appsettings.json`, refuses under "."
+ * and nests perfectly under ":".
+ */
+export class NestingConflictError extends SyntaxError {
+  readonly separator: string;
+  readonly suggestion?: string;
+
+  constructor(message: string, separator: string, suggestion?: string) {
+    super(message);
+    this.name = 'NestingConflictError';
+    this.separator = separator;
+    this.suggestion = suggestion;
+  }
+}
+
+/** The separator a refusal offers, whichever direction it came from. */
+export function suggestedSeparator(error: unknown): string | undefined {
+  return error instanceof SeparatorConflictError || error instanceof NestingConflictError
+    ? error.suggestion
+    : undefined;
+}
+
 function resolveSeparator(separator: string | undefined): string {
   const value = separator ?? DEFAULT_SEPARATOR;
   if (typeof value !== 'string' || value.length === 0) {
@@ -353,6 +382,78 @@ export function depthOf(value: unknown): number {
  * container an object, which is what a document of numeric keys wants.
  */
 export function unflattenJson(
+  input: unknown,
+  options: NestingOptions = {}
+): Record<string, unknown> | unknown[] {
+  try {
+    return nest(input, options);
+  } catch (error) {
+    // Which separator these keys are actually joined with is a question about
+    // the whole document, so it is answered out here rather than at the key
+    // that happened to collide first.
+    if (error instanceof SyntaxError) {
+      const separator = resolveSeparator(options.separator);
+      const suggestion = suggestNestingSeparator(input, options, separator);
+
+      throw new NestingConflictError(
+        suggestion
+          ? `${error.message} Nesting these keys with "${suggestion}" instead converts cleanly.`
+          : error.message,
+        separator,
+        suggestion
+      );
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * A separator these keys nest cleanly under, or `undefined` when none does.
+ *
+ * Unlike the flattening side, which wants a separator no key contains, this
+ * wants one the keys are actually joined with: a separator absent from every
+ * key nests nothing and would "succeed" by leaving the document as it is.
+ * Between candidates that work, the one splitting the most keys is the one the
+ * document is written in.
+ */
+export function suggestNestingSeparator(
+  input: unknown,
+  options: NestingOptions = {},
+  current?: string
+): string | undefined {
+  if (!isPlainObject(input)) {
+    return undefined;
+  }
+
+  const keys = Object.keys(input);
+  let best: { separator: string; split: number } | undefined;
+
+  for (const candidate of CANDIDATE_SEPARATORS) {
+    if (candidate === current) {
+      continue;
+    }
+
+    const split = keys.filter((key) => key.includes(candidate)).length;
+
+    if (split === 0 || (best && split <= best.split)) {
+      continue;
+    }
+
+    try {
+      // Offered only once it has nested the whole document, so the button
+      // cannot hand back the refusal it was meant to clear.
+      nest(input, { ...options, separator: candidate });
+      best = { separator: candidate, split };
+    } catch {
+      // This candidate collides too; the next one may not.
+    }
+  }
+
+  return best?.separator;
+}
+
+function nest(
   input: unknown,
   options: NestingOptions = {}
 ): Record<string, unknown> | unknown[] {

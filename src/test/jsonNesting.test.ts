@@ -4,8 +4,11 @@ import {
   countFlatKeys,
   depthOf,
   flattenJson,
+  NestingConflictError,
   SeparatorConflictError,
   sortKeysDeep,
+  suggestedSeparator,
+  suggestNestingSeparator,
   suggestSeparator,
   unflattenJson
 } from '../jsonNesting';
@@ -452,5 +455,70 @@ describe('the separator a refused document could use', () => {
     const flat = flattenJson(document, { separator });
 
     assert.deepEqual(unflattenJson(flat, { separator }), document);
+  });
+});
+
+describe('the separator keys refused by nesting are actually joined with', () => {
+  // Every .NET appsettings.json has this shape: paths joined with ":", and a
+  // last segment that is a namespace full of dots. Under "." the namespace
+  // splits and collides with the key beside it.
+  const appsettings = Object.freeze({
+    'Serilog:MinimumLevel:Default': 'Information',
+    'Serilog:MinimumLevel:Override:Microsoft': 'Warning',
+    'Serilog:MinimumLevel:Override:Microsoft.Extensions.Diagnostics.HealthChecks': 'Warning'
+  });
+
+  it('rides the refusal, so the editor can offer it', () => {
+    let thrown: unknown;
+
+    try {
+      unflattenJson(appsettings);
+    } catch (error) {
+      thrown = error;
+    }
+
+    assert.ok(thrown instanceof NestingConflictError);
+    assert.equal(thrown.suggestion, ':');
+    assert.equal(suggestedSeparator(thrown), ':');
+    assert.match(thrown.message, /conflicts with an earlier key/);
+    assert.match(thrown.message, /with ":" instead converts cleanly/);
+  });
+
+  it('offers one the document nests cleanly under', () => {
+    assert.deepEqual(unflattenJson(appsettings, { separator: ':' }), {
+      Serilog: {
+        MinimumLevel: {
+          Default: 'Information',
+          Override: {
+            Microsoft: 'Warning',
+            'Microsoft.Extensions.Diagnostics.HealthChecks': 'Warning'
+          }
+        }
+      }
+    });
+  });
+
+  it('never offers one absent from the keys, which would nest nothing', () => {
+    // "/" splits none of these, so nesting under it leaves the file as it is.
+    assert.notEqual(suggestNestingSeparator(appsettings, {}, '.'), '/');
+  });
+
+  it('prefers the separator that splits the most keys', () => {
+    const document = { 'a_b': 1, 'c:d': 2, 'e:f': 3, 'g:h': 4 };
+
+    assert.equal(suggestNestingSeparator(document, {}, '.'), ':');
+  });
+
+  it('offers nothing when the keys are genuinely duplicated', () => {
+    // Not a separator problem: these two say different things about "a.b".
+    assert.equal(suggestNestingSeparator({ 'a.b': 1, a: { b: 2 } }, {}, '.'), undefined);
+  });
+
+  it('offers nothing for a refusal no separator can clear', () => {
+    assert.equal(suggestNestingSeparator({ '__proto__.x': 1 }, {}, '.'), undefined);
+  });
+
+  it('leaves a document that nests cleanly alone', () => {
+    assert.deepEqual(unflattenJson({ 'a.b': 1, 'a.c': 2 }), { a: { b: 1, c: 2 } });
   });
 });
