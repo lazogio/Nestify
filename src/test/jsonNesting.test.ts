@@ -419,7 +419,9 @@ describe('the separator a refused document could use', () => {
   });
 
   it('looks inside arrays, whose items carry keys of their own', () => {
-    assert.equal(suggestSeparator({ rows: [{ 'a/b': 1 }] }), '_');
+    // With "." in force the first candidate is "/", which only the key buried
+    // in the array rules out; missing it would offer a separator that refuses.
+    assert.equal(suggestSeparator({ rows: [{ 'a/b': 1 }] }, '.'), '_');
   });
 
   it('never offers the separator that was just refused', () => {
@@ -520,5 +522,60 @@ describe('the separator keys refused by nesting are actually joined with', () =>
 
   it('leaves a document that nests cleanly alone', () => {
     assert.deepEqual(unflattenJson({ 'a.b': 1, 'a.c': 2 }), { a: { b: 1, c: 2 } });
+  });
+});
+
+describe('the two separators a JSON file is usually joined with', () => {
+  // "." is what every flattener writes; ":" is what .NET configuration uses.
+  // Setting one for a project must not strand the files written in the other,
+  // so each has to be offered its way back to the other.
+  const dotJoined = Object.freeze({ 'app.name': 'nestify', 'app.title': 'Nestify' });
+  const colonJoined = Object.freeze({
+    'Serilog:Level': 'Information',
+    'Serilog:Override:Microsoft': 'Warning',
+    'Serilog:Override:Microsoft.Extensions': 'Warning'
+  });
+
+  it('offers ":" for a colon file while the separator is "."', () => {
+    assert.equal(suggestNestingSeparator(colonJoined, {}, '.'), ':');
+  });
+
+  it('offers "." for a dot file while the separator is ":"', () => {
+    // The reverse trip: nesting under ":" splits none of these keys, so it
+    // would hand the file back unchanged rather than refuse.
+    assert.deepEqual(unflattenJson(dotJoined, { separator: ':' }), dotJoined);
+    assert.equal(suggestNestingSeparator(dotJoined, {}, ':'), '.');
+  });
+
+  it('offers "." to flattening too, when the keys hold ":"', () => {
+    assert.equal(suggestSeparator({ 'a:b': 1 }, ':'), '.');
+  });
+
+  it('never offers the separator already in force, in either direction', () => {
+    assert.notEqual(suggestSeparator({ 'a.b': 1 }, '.'), '.');
+    assert.notEqual(suggestNestingSeparator(colonJoined, {}, ':'), ':');
+  });
+
+  it('picks the one more of the keys are joined with when both occur', () => {
+    assert.equal(suggestNestingSeparator({ 'a.b': 1, 'c:d': 2, 'e:f': 3 }, {}, '|'), ':');
+    assert.equal(suggestNestingSeparator({ 'a.b': 1, 'c.d': 2, 'e:f': 3 }, {}, '|'), '.');
+  });
+
+  it('offers nothing for a document that is already nested', () => {
+    // Nothing to nest under any separator, so a press is a no-op rather than a
+    // refusal — the same reason a round-tripped file must stay quiet.
+    assert.equal(suggestNestingSeparator({ app: { name: 'n' } }, {}, ':'), undefined);
+    assert.equal(suggestNestingSeparator(flattenJson({ a: 1 }), {}, '.'), undefined);
+  });
+
+  it('keeps the round trip intact through either separator', () => {
+    for (const separator of ['.', ':']) {
+      const original = { Serilog: { Override: { Microsoft: 'Warning' } }, tags: ['a'] };
+
+      assert.deepEqual(
+        unflattenJson(flattenJson(original, { separator }), { separator }),
+        original
+      );
+    }
   });
 });

@@ -85,7 +85,10 @@ and whose last segment is a dotted namespace like
 `Serilog:MinimumLevel:Override:Microsoft.Extensions.Diagnostics` — is refused under
 `.`, since the namespace splits and collides with the key beside it. The message
 offers the `:` those keys are actually written with, under which the file nests
-cleanly.
+cleanly. It works the other way round just as well: with `nestify.separator` set to
+`:` for those config files, a dot-joined file has no key to split, so rather than
+handing it back unchanged Nestify offers the `.` it is written with. A file that is
+already nested has nothing to do under any separator, and converts quietly.
 
 ## Contributing
 
