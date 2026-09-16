@@ -26,7 +26,7 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     // From the view's row action with that row's converter, from the palette
     // without one, in which case it asks.
-    vscode.commands.registerCommand('nestify.copyConverted', (target?: string | Converter) =>
+    vscode.commands.registerCommand('nestify.copyConverted', (target?: unknown) =>
       copyConverted(target)
     ),
     trackActiveEditor(),
@@ -105,7 +105,7 @@ async function pickConverter(placeHolder: string): Promise<Converter | undefined
 }
 
 async function pickAndApplyConverter(): Promise<void> {
-  const converter = await pickConverter('Choose a conversion to apply to the selection');
+  const converter = await pickConverter('Choose a conversion to apply to the selection, or the whole file');
 
   if (converter) {
     await applyConverter(converter);
@@ -116,16 +116,19 @@ async function pickAndApplyConverter(): Promise<void> {
  * Writes the conversion to the clipboard, leaving the file alone — for pasting
  * a flattened copy somewhere else, or for looking before leaping.
  */
-async function copyConverted(target?: string | Converter): Promise<void> {
-  const converter =
-    target === undefined
-      ? await pickConverter('Choose a conversion to copy to the clipboard')
-      : converterFor(target);
+async function copyConverted(target?: unknown): Promise<void> {
+  // The editor's context menu runs its commands with the file's URI, so an
+  // argument is not by itself a converter. Anything that names none asks.
+  const named =
+    typeof target === 'string' || isConverter(target)
+      ? converterFor(target)
+      : await pickConverter('Choose a conversion to copy to the clipboard');
 
-  if (!converter) {
+  if (!named) {
     return;
   }
 
+  const converter = named;
   const where = conversionTarget();
 
   if (!where) {
@@ -160,6 +163,15 @@ function converterFor(target: string | Converter): Converter | undefined {
   }
 
   return converter;
+}
+
+/** Whether a command argument is a converter rather than, say, a resource URI. */
+function isConverter(value: unknown): value is Converter {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as Converter).run === 'function'
+  );
 }
 
 /** The text a conversion reads, and where it sits. */
@@ -209,11 +221,17 @@ function revealProblem(target: ConversionTarget, error: unknown): void {
     return;
   }
 
-  const { editor, range } = target;
+  const { editor, range, hadSelection } = target;
   // The offset is into the converted text, which starts wherever the range does.
   const spot = editor.document.positionAt(editor.document.offsetAt(range.start) + offset);
 
-  editor.selection = new vscode.Selection(spot, spot);
+  // Scrolling to the spot is safe; moving the cursor there is not when the user
+  // had a selection. Clearing it would make the next run convert the whole file
+  // instead of the fragment they were working on.
+  if (!hadSelection) {
+    editor.selection = new vscode.Selection(spot, spot);
+  }
+
   editor.revealRange(new vscode.Range(spot, spot), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
 }
 

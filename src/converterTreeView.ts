@@ -111,12 +111,12 @@ function tooltipFor(converter: Converter, blocked: string | undefined): vscode.M
   tooltip.appendMarkdown(`**${converter.title}**\n\n`);
 
   if (blocked) {
-    tooltip.appendMarkdown(`${explanations[converter.id] ?? blocked}\n\n`);
+    tooltip.appendMarkdown(`${explanations.get(converter.id) ?? blocked}\n\n`);
   }
 
   tooltip.appendMarkdown('Click to run on the selection, or on the whole file when nothing is selected.');
 
-  const example = examples[converter.id];
+  const example = examples.get(converter.id);
 
   if (example) {
     tooltip.appendMarkdown('\n\n');
@@ -126,15 +126,17 @@ function tooltipFor(converter: Converter, blocked: string | undefined): vscode.M
   return tooltip;
 }
 
-const explanations: Record<string, string> = {
-  flatten: 'This JSON has no nesting left to flatten.',
-  unflatten: 'No key here is a joined path — nesting expects keys such as "app.name".'
-};
+// Maps rather than object literals: a converter id is whatever its author chose,
+// and a plain lookup of "toString" would hand back a function.
+const explanations = new Map<string, string>([
+  ['flatten', 'This JSON has no nesting left to flatten.'],
+  ['unflatten', 'No key here is a joined path — nesting expects keys such as "app.name".']
+]);
 
-const examples: Record<string, string> = {
-  flatten: '// before\n{ "app": { "name": "nestify" } }\n\n// after\n{ "app.name": "nestify" }',
-  unflatten: '// before\n{ "app.name": "nestify" }\n\n// after\n{ "app": { "name": "nestify" } }'
-};
+const examples = new Map<string, string>([
+  ['flatten', '// before\n{ "app": { "name": "nestify" } }\n\n// after\n{ "app.name": "nestify" }'],
+  ['unflatten', '// before\n{ "app.name": "nestify" }\n\n// after\n{ "app": { "name": "nestify" } }']
+]);
 
 /** Matches the icons already used by the toolbar buttons, falling back to a generic one. */
 function themeIconFor(converterId: string): string {
