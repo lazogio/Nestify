@@ -74,6 +74,10 @@ cursor to the bad character. `CONTRIBUTING.md` has a worked example.
   `flattenJson` therefore *refuses up front* any key `unflattenJson` could not take
   back: one already containing the separator, an empty segment, `__proto__`, or two
   paths that join to the same flat key. Both directions must agree by construction.
+  The pure functions keep that rule without exception; the `flatten` converter is
+  what decides an already-flat document (`depthOf <= 1`, arrays aside) has no path
+  to join and hands it straight back, which is the identity rather than a
+  conversion the rule needs to protect.
 - Prototype-safe writes: build results with `Object.fromEntries`, and use
   `Object.prototype.hasOwnProperty.call` for lookups — a plain `cursor[key]` finds
   inherited members, which used to break keys named `toString`/`valueOf`.

@@ -2,6 +2,17 @@
 
 All notable changes to Nestify are documented in this file.
 
+## [0.0.7] - 2026-09-16
+
+### Fixed
+
+- Flattening a document that is already flat no longer refuses over a key
+  holding the separator. A flat .NET config was refused over the dots in
+  `Elastic.Apm` and offered a switch to `/`, which produced the very same file
+  back: there is nothing to join in a flat document, so no separator can make a
+  key ambiguous. A document with anything really nested inside it is refused
+  exactly as before, and a top-level array still flattens to its indices.
+
 ## [0.0.6] - 2026-09-16
 
 ### Added
