@@ -1,0 +1,31 @@
+name: CI
+
+# Every push to main and every pull request, so a change is checked before it
+# reaches the branch a release is cut from.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          # Matches the version the publish workflow builds with.
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Compiles first, so a type error fails here rather than at publish time.
+      - name: Compile and run the tests
+        run: npm test
