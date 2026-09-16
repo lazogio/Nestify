@@ -58,6 +58,12 @@
         "command": "nestify.runConverter",
         "title": "Run Converter",
         "category": "Nestify"
+      },
+      {
+        "command": "nestify.copyConverted",
+        "title": "Copy Converted…",
+        "category": "Nestify",
+        "icon": "$(clippy)"
       }
     ],
     "viewsContainers": {
@@ -102,6 +108,10 @@
         {
           "command": "nestify.runConverter",
           "when": "false"
+        },
+        {
+          "command": "nestify.copyConverted",
+          "when": "editorIsOpen"
         }
       ],
       "editor/context": [
@@ -123,6 +133,17 @@
         {
           "command": "nestify.convert",
           "group": "nestify@30"
+        },
+        {
+          "command": "nestify.copyConverted",
+          "group": "nestify@40"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "nestify.copyConverted",
+          "when": "view == nestify.converters",
+          "group": "inline"
         }
       ],
       "view/title": [
@@ -164,6 +185,24 @@
           "minimum": 0,
           "maximum": 10,
           "description": "Number of spaces used to indent the JSON that Nestify writes back."
+        },
+        "nestify.arrays": {
+          "type": "string",
+          "enum": [
+            "rebuild",
+            "objects"
+          ],
+          "enumDescriptions": [
+            "Keys that are exactly the indices 0…n-1 become the array they were flattened from.",
+            "Every container stays an object, so index-like keys are kept as keys."
+          ],
+          "default": "rebuild",
+          "description": "What nesting does with keys that are consecutive indices from zero."
+        },
+        "nestify.sortKeys": {
+          "type": "boolean",
+          "default": false,
+          "description": "Write the converted JSON with each object's keys in order."
         }
       }
     }

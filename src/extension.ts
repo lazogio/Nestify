@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { targetEditor, trackActiveEditor } from './activeEditor';
+import { ConversionError } from './converters/jsonSource';
 import { Converter, getConverter, listConverters, requireConverter } from './converters/registry';
 import { ConverterTreeProvider } from './converterTreeView';
 
@@ -22,6 +23,11 @@ export function activate(context: vscode.ExtensionContext): void {
     // Invoked by the Activity Bar view, which passes the row's converter id.
     vscode.commands.registerCommand('nestify.runConverter', (target: string | Converter) =>
       runConverter(target)
+    ),
+    // From the view's row action with that row's converter, from the palette
+    // without one, in which case it asks.
+    vscode.commands.registerCommand('nestify.copyConverted', (target?: string | Converter) =>
+      copyConverted(target)
     ),
     trackActiveEditor(),
     view,
@@ -67,31 +73,23 @@ export function deactivate(): void {
  * UI element rather than code.
  */
 async function runConverter(target: string | Converter): Promise<void> {
-  if (typeof target !== 'string') {
-    await applyConverter(target);
-    return;
+  const converter = converterFor(target);
+
+  if (converter) {
+    await applyConverter(converter);
   }
-
-  const converter = getConverter(target);
-
-  if (!converter) {
-    vscode.window.showErrorMessage(`Nestify: no converter registered for "${target}".`);
-    return;
-  }
-
-  await applyConverter(converter);
 }
 
 /**
  * Lets the user choose any registered converter. New converters show up here
  * for free, without touching package.json or this file.
  */
-async function pickAndApplyConverter(): Promise<void> {
+async function pickConverter(placeHolder: string): Promise<Converter | undefined> {
   const converters = listConverters();
 
   if (converters.length === 0) {
     vscode.window.showErrorMessage('Nestify: no converters are registered.');
-    return;
+    return undefined;
   }
 
   const picked = await vscode.window.showQuickPick(
@@ -100,15 +98,123 @@ async function pickAndApplyConverter(): Promise<void> {
       description: converter.hint,
       converter
     })),
-    {
-      title: 'Nestify',
-      placeHolder: 'Choose a conversion to apply to the selection'
-    }
+    { title: 'Nestify', placeHolder }
   );
 
-  if (picked) {
-    await applyConverter(picked.converter);
+  return picked?.converter;
+}
+
+async function pickAndApplyConverter(): Promise<void> {
+  const converter = await pickConverter('Choose a conversion to apply to the selection');
+
+  if (converter) {
+    await applyConverter(converter);
   }
+}
+
+/**
+ * Writes the conversion to the clipboard, leaving the file alone — for pasting
+ * a flattened copy somewhere else, or for looking before leaping.
+ */
+async function copyConverted(target?: string | Converter): Promise<void> {
+  const converter =
+    target === undefined
+      ? await pickConverter('Choose a conversion to copy to the clipboard')
+      : converterFor(target);
+
+  if (!converter) {
+    return;
+  }
+
+  const where = conversionTarget();
+
+  if (!where) {
+    return;
+  }
+
+  const converted = convert(converter, where);
+
+  if (converted === undefined) {
+    return;
+  }
+
+  await vscode.env.clipboard.writeText(converted);
+
+  const scope = where.hadSelection ? 'selection' : 'document';
+  vscode.window.setStatusBarMessage(
+    `$(clippy) Nestify: ${converter.title} of the ${scope} copied to the clipboard`,
+    3000
+  );
+}
+
+/** The converter behind a command argument, reporting an unknown id. */
+function converterFor(target: string | Converter): Converter | undefined {
+  if (typeof target !== 'string') {
+    return target;
+  }
+
+  const converter = getConverter(target);
+
+  if (!converter) {
+    vscode.window.showErrorMessage(`Nestify: no converter registered for "${target}".`);
+  }
+
+  return converter;
+}
+
+/** The text a conversion reads, and where it sits. */
+interface ConversionTarget {
+  readonly editor: vscode.TextEditor;
+  readonly range: vscode.Range;
+  readonly hadSelection: boolean;
+}
+
+/** The selection, or the whole document when nothing is selected. */
+function conversionTarget(): ConversionTarget | undefined {
+  const editor = targetEditor();
+
+  if (!editor) {
+    vscode.window.showErrorMessage('Nestify: open a file first.');
+    return undefined;
+  }
+
+  const document = editor.document;
+  const hadSelection = !editor.selection.isEmpty;
+
+  const range = hadSelection
+    ? new vscode.Range(editor.selection.start, editor.selection.end)
+    : new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length));
+
+  return { editor, range, hadSelection };
+}
+
+/**
+ * Runs the converter, or reports why it could not and puts the cursor on the
+ * character the parser stopped at, which beats hunting for it by hand.
+ */
+function convert(converter: Converter, target: ConversionTarget): string | undefined {
+  try {
+    return converter.run(target.editor.document.getText(target.range));
+  } catch (error) {
+    vscode.window.showErrorMessage(reportable(error));
+    revealProblem(target, error);
+    return undefined;
+  }
+}
+
+function revealProblem(target: ConversionTarget, error: unknown): void {
+  const offset = error instanceof ConversionError ? error.offset : undefined;
+
+  if (offset === undefined) {
+    return;
+  }
+
+  const { editor, range } = target;
+  // The offset is into the converted text, which starts wherever the range does.
+  const spot = editor.document.positionAt(editor.document.offsetAt(range.start) + offset);
+
+  editor.selection = new vscode.Selection(spot, spot);
+  editor.revealRange(new vscode.Range(spot, spot), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
 }
 
 /**
@@ -122,27 +228,17 @@ function reportable(error: unknown): string {
 }
 
 async function applyConverter(converter: Converter): Promise<void> {
-  const editor = targetEditor();
+  const target = conversionTarget();
 
-  if (!editor) {
-    vscode.window.showErrorMessage('Nestify: open a file first.');
+  if (!target) {
     return;
   }
 
+  const { editor, range, hadSelection } = target;
   const document = editor.document;
-  const hadSelection = !editor.selection.isEmpty;
+  const converted = convert(converter, target);
 
-  // Operate on the selection, or on the whole document when nothing is selected.
-  const range = hadSelection
-    ? new vscode.Range(editor.selection.start, editor.selection.end)
-    : new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length));
-
-  let converted: string;
-
-  try {
-    converted = converter.run(document.getText(range));
-  } catch (error) {
-    vscode.window.showErrorMessage(reportable(error));
+  if (converted === undefined) {
     return;
   }
 

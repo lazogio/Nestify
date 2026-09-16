@@ -8,6 +8,12 @@
 export interface NestingOptions {
   /** Separator used to join and split key paths. Defaults to ".". */
   separator?: string;
+  /**
+   * What nesting does with a container whose keys are exactly the indices
+   * `0…n-1`: rebuild the array it came from, or leave the object. Defaults to
+   * "rebuild". Flattening ignores this.
+   */
+  arrays?: 'rebuild' | 'objects';
 }
 
 /** A flat map of dot-joined key paths to leaf values. */
@@ -182,12 +188,16 @@ export function depthOf(value: unknown): number {
 /**
  * Rebuilds a nested structure from a flat map of `separator`-joined keys.
  *
- * Numeric path segments are treated as ordinary object keys, never as array
- * indices: `{ "tags.0": "a" }` becomes `{ tags: { "0": "a" } }`. Arrays are
- * never reconstructed, which keeps the transform lossless for sparse or
- * non-sequential numeric keys.
+ * A container whose keys are exactly the indices `0…n-1` becomes the array it
+ * was flattened from, so `{ "tags.0": "a" }` comes back as `{ tags: ["a"] }`.
+ * Gaps and out-of-order numeric keys stay an object, since no array could hold
+ * them without inventing values. Pass `arrays: "objects"` to keep every
+ * container an object, which is what a document of numeric keys wants.
  */
-export function unflattenJson(input: unknown, options: NestingOptions = {}): Record<string, unknown> {
+export function unflattenJson(
+  input: unknown,
+  options: NestingOptions = {}
+): Record<string, unknown> | unknown[] {
   const separator = resolveSeparator(options.separator);
 
   if (!isPlainObject(input)) {
@@ -195,6 +205,9 @@ export function unflattenJson(input: unknown, options: NestingOptions = {}): Rec
   }
 
   const result: Record<string, unknown> = {};
+  // Only the containers this call creates may become arrays; a leaf value that
+  // was already an object stays exactly as the flat document spelled it.
+  const built = new Set<Record<string, unknown>>();
 
   for (const flatKey of Object.keys(input)) {
     const segments = flatKey.split(separator);
@@ -220,6 +233,7 @@ export function unflattenJson(input: unknown, options: NestingOptions = {}): Rec
 
       if (existing === undefined) {
         const child: Record<string, unknown> = {};
+        built.add(child);
         cursor[segment] = child;
         cursor = child;
         continue;
@@ -243,5 +257,71 @@ export function unflattenJson(input: unknown, options: NestingOptions = {}): Rec
     cursor[leaf] = input[flatKey];
   }
 
-  return result;
+  if (options.arrays === 'objects') {
+    return result;
+  }
+
+  built.add(result);
+  return rebuildArrays(result, built);
+}
+
+/** Rebuilds the arrays under `container`, deepest first, then the container. */
+function rebuildArrays(
+  container: Record<string, unknown>,
+  built: Set<Record<string, unknown>>
+): Record<string, unknown> | unknown[] {
+  for (const key of Object.keys(container)) {
+    const value = container[key];
+
+    if (isPlainObject(value) && built.has(value)) {
+      container[key] = rebuildArrays(value, built);
+    }
+  }
+
+  return asArray(container) ?? container;
+}
+
+/**
+ * The array whose indices these keys are, or `undefined` when they are not
+ * exactly `0…n-1`. `Object.keys` lists index-like keys in ascending order, so
+ * keys that arrived out of order still rebuild; "01" is not an index and so
+ * keeps the container an object.
+ */
+function asArray(container: Record<string, unknown>): unknown[] | undefined {
+  const keys = Object.keys(container);
+
+  if (keys.length === 0) {
+    return undefined;
+  }
+
+  for (let i = 0; i < keys.length; i++) {
+    if (keys[i] !== String(i)) {
+      return undefined;
+    }
+  }
+
+  return keys.map((key) => container[key]);
+}
+
+/**
+ * The same value with every plain object's keys in order, for a diff that does
+ * not depend on where a key was written. Arrays keep their order, an array's
+ * order being its meaning.
+ */
+export function sortKeysDeep(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortKeysDeep);
+  }
+
+  if (!isPlainObject(value)) {
+    return value;
+  }
+
+  // Built from entries so that a key named after a prototype member is written
+  // as data rather than acted on.
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .map((key) => [key, sortKeysDeep(value[key])])
+  );
 }
