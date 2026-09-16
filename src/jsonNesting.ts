@@ -60,6 +60,26 @@ function isContainer(value: unknown): value is Record<string, unknown> | unknown
  * an empty segment, or `__proto__`.
  */
 export function flattenJson(input: unknown, options: NestingOptions = {}): FlatJson {
+  const leaves = collectLeaves(input, options);
+
+  // `Object.fromEntries` defines each key as an own property whatever it is
+  // called, where a plain `result[key] = …` would treat some names as
+  // instructions; the Map keeps the keys in the order they were met.
+  return Object.fromEntries([...leaves].map(([key, leaf]) => [key, leaf.value]));
+}
+
+/**
+ * How many keys flattening would write, refusing whatever `flattenJson` would.
+ *
+ * The Activity Bar reads this on every keystroke and wants only the number, so
+ * it stops at the map the walk already builds rather than materialising an
+ * object and its key list to count them.
+ */
+export function countFlatKeys(input: unknown, options: NestingOptions = {}): number {
+  return collectLeaves(input, options).size;
+}
+
+function collectLeaves(input: unknown, options: NestingOptions): Flattening['leaves'] {
   const separator = resolveSeparator(options.separator);
 
   if (!isContainer(input)) {
@@ -70,10 +90,7 @@ export function flattenJson(input: unknown, options: NestingOptions = {}): FlatJ
 
   walk(input, [], into);
 
-  // `Object.fromEntries` defines each key as an own property whatever it is
-  // called, where a plain `result[key] = …` would treat some names as
-  // instructions; the Map keeps the keys in the order they were met.
-  return Object.fromEntries([...into.leaves].map(([key, leaf]) => [key, leaf.value]));
+  return into.leaves;
 }
 
 /** The state a single `flattenJson` call threads through its recursion. */

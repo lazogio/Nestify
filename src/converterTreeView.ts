@@ -51,11 +51,11 @@ export class ConverterTreeProvider implements vscode.TreeDataProvider<Converter>
       vscode.TreeItemCollapsibleState.None
     );
 
-    const blocked = reasonToSkip(converter.id, this.summary);
+    const blocked = converter.skipReason?.(this.summary);
 
     item.id = converter.id;
     item.description = blocked ?? converter.hint;
-    item.iconPath = new vscode.ThemeIcon(themeIconFor(converter.id));
+    item.iconPath = new vscode.ThemeIcon(converter.icon ?? 'json');
     item.tooltip = tooltipFor(converter, blocked);
     // The whole row runs the conversion; copying it to the clipboard instead is
     // the one inline action beside it, which hover reveals.
@@ -83,25 +83,6 @@ export class ConverterTreeProvider implements vscode.TreeDataProvider<Converter>
 }
 
 /**
- * Why running this converter now would not help, or `undefined` when it would.
- * Saying so on the row is cheaper for the user than clicking and reading an
- * error notification.
- */
-function reasonToSkip(converterId: string, summary: ActiveJsonSummary): string | undefined {
-  if (converterId === 'flatten' && summary.shape === 'flat') {
-    return 'already flat';
-  }
-
-  // Asked of the keys themselves, not of the depth: a nested file can still
-  // hold a joined key, and nesting it works, so the row must not refuse it.
-  if (converterId === 'unflatten' && summary.joinedKeys === false) {
-    return 'no joined keys';
-  }
-
-  return undefined;
-}
-
-/**
  * The row is deliberately terse, so the tooltip carries the roomier version for
  * anyone who wants it.
  */
@@ -111,12 +92,12 @@ function tooltipFor(converter: Converter, blocked: string | undefined): vscode.M
   tooltip.appendMarkdown(`**${converter.title}**\n\n`);
 
   if (blocked) {
-    tooltip.appendMarkdown(`${explanations.get(converter.id) ?? blocked}\n\n`);
+    tooltip.appendMarkdown(`${blocked}, so it would leave the JSON as it is.\n\n`);
   }
 
   tooltip.appendMarkdown('Click to run on the selection, or on the whole file when nothing is selected.');
 
-  const example = examples.get(converter.id);
+  const example = converter.example;
 
   if (example) {
     tooltip.appendMarkdown('\n\n');
@@ -124,28 +105,4 @@ function tooltipFor(converter: Converter, blocked: string | undefined): vscode.M
   }
 
   return tooltip;
-}
-
-// Maps rather than object literals: a converter id is whatever its author chose,
-// and a plain lookup of "toString" would hand back a function.
-const explanations = new Map<string, string>([
-  ['flatten', 'This JSON has no nesting left to flatten.'],
-  ['unflatten', 'No key here is a joined path — nesting expects keys such as "app.name".']
-]);
-
-const examples = new Map<string, string>([
-  ['flatten', '// before\n{ "app": { "name": "nestify" } }\n\n// after\n{ "app.name": "nestify" }'],
-  ['unflatten', '// before\n{ "app.name": "nestify" }\n\n// after\n{ "app": { "name": "nestify" } }']
-]);
-
-/** Matches the icons already used by the toolbar buttons, falling back to a generic one. */
-function themeIconFor(converterId: string): string {
-  switch (converterId) {
-    case 'flatten':
-      return 'list-flat';
-    case 'unflatten':
-      return 'list-tree';
-    default:
-      return 'json';
-  }
 }

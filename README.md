@@ -64,9 +64,10 @@ Keys that are not exactly the indices `0…n-1` — a gap, or `"01"` — stay an
 since no array could hold them without inventing values.
 
 The one shape this cannot tell apart is an object whose keys already are `"0"`, `"1"`,
-… : it flattens the same way an array does, so it comes back as an array. Set
-`nestify.arrays` to `"objects"` if that is your data, and every container stays an
-object on the way back.
+… : it flattens the same way an array does, so it comes back as an array — including
+the file itself, which turns from an object into a JSON array when its own top-level
+keys are indices. Set `nestify.arrays` to `"objects"` if that is your data, and every
+container stays an object on the way back.
 
 A key that already contains the separator is refused, because once joined it cannot
 be told from a path: flattening `{ "app": { "v1.2": { "x": 1 } } }` would produce

@@ -1,6 +1,6 @@
-import * as vscode from 'vscode';
-import { targetEditor } from './activeEditor';
-import { depthOf, flattenJson } from './jsonNesting';
+import { conversionTarget } from './activeEditor';
+import { countFlatKeys, depthOf } from './jsonNesting';
+import { readSettings } from './settings';
 
 /** What the view knows about the text a conversion would run on. */
 export interface ActiveJsonSummary {
@@ -22,21 +22,20 @@ export interface ActiveJsonSummary {
 const MAX_ANALYSED_CHARS = 500_000;
 
 /**
- * Describes the text a conversion would act on: the selection when there is
- * one, the whole file otherwise. Mirrors how `applyConverter` picks its range,
- * so the view cannot claim something the commands would not do.
+ * Describes the text a conversion would act on. It asks `conversionTarget()`
+ * for that text, the same way the commands do, so the view cannot claim
+ * something a conversion would not act on.
  */
 export function summariseActiveJson(): ActiveJsonSummary {
-  const editor = targetEditor();
+  const target = conversionTarget();
 
-  if (!editor) {
+  if (!target) {
     return { problem: 'Open a JSON file to convert it.' };
   }
 
-  const document = editor.document;
-  const hasSelection = !editor.selection.isEmpty;
-  const text = hasSelection ? document.getText(editor.selection) : document.getText();
-  const scope = hasSelection ? 'selection' : 'file';
+  const { editor, range, hadSelection } = target;
+  const text = editor.document.getText(range);
+  const scope = hadSelection ? 'selection' : 'file';
 
   if (text.trim().length === 0) {
     return { problem: `The ${scope} is empty.` };
@@ -58,12 +57,14 @@ export function summariseActiveJson(): ActiveJsonSummary {
     return { problem: `The ${scope} is a single value, not an object or array.` };
   }
 
-  const separator = vscode.workspace.getConfiguration('nestify').get<string>('separator', '.') || '.';
+  const { separator } = readSettings(editor.document.uri);
   let keyCount: number;
   let depth: number;
 
   try {
-    keyCount = Object.keys(flattenJson(parsed, { separator })).length;
+    // Counted rather than built: this runs on every keystroke, and only the
+    // number is wanted. It still refuses whatever a conversion would.
+    keyCount = countFlatKeys(parsed, { separator });
     depth = depthOf(parsed);
   } catch (error) {
     // Valid JSON that still cannot be flattened, such as two keys that join to
@@ -85,7 +86,7 @@ export function summariseActiveJson(): ActiveJsonSummary {
   return {
     // The file name is already on the editor tab, so this spends its width on
     // the two numbers a conversion changes.
-    headerDetail: hasSelection ? `Selection: ${keys} · ${nesting}` : `${keys} · ${nesting}`,
+    headerDetail: hadSelection ? `Selection: ${keys} · ${nesting}` : `${keys} · ${nesting}`,
     shape: depth <= 1 ? 'flat' : 'nested',
     joinedKeys: hasJoinedKeys(parsed, separator)
   };

@@ -6,6 +6,15 @@
  * do — `extension.ts` never needs to learn about it.
  */
 
+import type { Uri } from 'vscode';
+import type { ActiveJsonSummary } from '../activeJsonSummary';
+
+/** What a conversion is running on, for settings a folder can override. */
+export interface ConversionContext {
+  /** The document the text came from, when it came from one. */
+  readonly resource?: Uri;
+}
+
 export interface Converter {
   /** Stable identifier, e.g. "flatten" or "json-to-yaml". */
   readonly id: string;
@@ -24,8 +33,14 @@ export interface Converter {
    * says what you get.
    */
   readonly hint?: string;
+  /** Codicon id for the row in the Activity Bar. Falls back to a generic one. */
+  readonly icon?: string;
+  /** Why this converter would not help right now, read from the view's reading. */
+  skipReason?(summary: ActiveJsonSummary): string | undefined;
+  /** A before/after sketch for the tooltip, as JSON with comments. */
+  readonly example?: string;
   /** Transforms the source text, or throws an Error explaining why it cannot. */
-  run(sourceText: string): string;
+  run(sourceText: string, context?: ConversionContext): string;
 }
 
 const converters = new Map<string, Converter>();
