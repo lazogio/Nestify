@@ -16,7 +16,7 @@ Press `F5` in VS Code to launch an Extension Development Host with Nestify loade
 images/icon.svg                    icon source; icon.png is the rasterised 128×128
 src/
   extension.ts                     activate(): wires the commands to the registry
-  jsonNesting.ts                   pure flattenJson() / unflattenJson(), no vscode import
+  jsonNesting.ts                   pure flattenJson() / unflattenJson() / depthOf(), no vscode import
   converters/
     registry.ts                    Converter registry (id, title, run)
     jsonFlattenConverters.ts       registers "flatten" and "unflatten"

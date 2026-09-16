@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { flattenJson, unflattenJson } from '../jsonNesting';
+import { depthOf, flattenJson, unflattenJson } from '../jsonNesting';
 
 /** The thrown message, so a test can assert on what the user would read. */
 function messageFrom(run: () => unknown): string {
@@ -138,6 +138,26 @@ describe('unflattenJson', () => {
     }
   });
 
+  describe('keys that share a name with an Object.prototype member', () => {
+    it('nests a key called "toString" like any other', () => {
+      assert.deepEqual(unflattenJson({ 'toString.x': 1 }), { toString: { x: 1 } });
+    });
+
+    it('nests one deeper in the path too', () => {
+      assert.deepEqual(unflattenJson({ 'a.valueOf.b': 1 }), { a: { valueOf: { b: 1 } } });
+    });
+
+    it('round trips such a key', () => {
+      const original = JSON.parse('{"toString": {"x": 1}, "hasOwnProperty": {"y": 2}}');
+
+      assert.deepEqual(unflattenJson(flattenJson(original)), original);
+    });
+
+    it('still refuses a real conflict on such a name', () => {
+      assert.throws(() => unflattenJson({ toString: 1, 'toString.x': 2 }), SyntaxError);
+    });
+  });
+
   it('refuses a key that conflicts with an earlier value', () => {
     const message = messageFrom(() => unflattenJson({ a: 1, 'a.b': 2 }));
 
@@ -155,6 +175,37 @@ describe('unflattenJson', () => {
   it('refuses anything but an object at the top level', () => {
     assert.throws(() => unflattenJson([1, 2]), TypeError);
     assert.throws(() => unflattenJson('nope'), TypeError);
+  });
+});
+
+describe('depthOf', () => {
+  it('counts a scalar as no depth at all', () => {
+    assert.equal(depthOf('nestify'), 0);
+    assert.equal(depthOf(null), 0);
+  });
+
+  it('counts a flat object as one level', () => {
+    assert.equal(depthOf({ a: 1, b: 2 }), 1);
+  });
+
+  it('counts each populated container as a level', () => {
+    assert.equal(depthOf({ a: { b: { c: 1 } } }), 3);
+    assert.equal(depthOf({ tags: ['a'] }), 2);
+  });
+
+  it('counts an empty container as a leaf, matching flattenJson', () => {
+    assert.equal(depthOf({ none: [], nothing: {} }), 1);
+    assert.equal(depthOf({}), 0);
+  });
+
+  it('measures by the deepest branch', () => {
+    assert.equal(depthOf({ shallow: 1, deep: { deeper: { deepest: 1 } } }), 3);
+  });
+
+  it('handles a container with far more children than fit in an argument list', () => {
+    // A spread of one argument per child overflowed the stack here, which threw
+    // out of the view's refresh — on a file well under the size it will measure.
+    assert.equal(depthOf({ items: new Array(200_000).fill(0) }), 2);
   });
 });
 

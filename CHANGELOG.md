@@ -11,7 +11,10 @@ All notable changes to Nestify are documented in this file.
   names both clashing paths and changes nothing. A key called `__proto__` is
   likewise carried through as data instead of disappearing.
 - The Activity Bar view states the clash above the list rather than reporting a
-  key count the conversion would refuse.
+  key count the conversion would refuse, and no longer throws while you type
+  over a file with a very large array — it says it cannot measure instead.
+- Nesting a key named after a built-in, such as `toString` or `valueOf`, no
+  longer fails with a conflict that was not there.
 
 ### Added
 
