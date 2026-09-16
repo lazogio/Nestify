@@ -1,4 +1,5 @@
 import {
+  depthOf,
   flattenJson,
   NestingConflictError,
   sortKeysDeep,
@@ -29,6 +30,15 @@ registerConverter({
 
     if (typeof parsed !== 'object' || parsed === null) {
       throw new Error('Flattening needs a JSON object or array — got a single scalar value.');
+    }
+
+    // A document with nothing nested in it flattens to itself, whatever the
+    // separator: there is no path to join, so no key can be made ambiguous by
+    // joining one. Asking the separator first refused a flat .NET config over
+    // the dots in "Elastic.Apm" and offered a switch to "/" that handed back
+    // the very same bytes. An array is not this case — its indices become keys.
+    if (!Array.isArray(parsed) && depthOf(parsed) <= 1) {
+      return stringify(parsed, indent, sortKeys);
     }
 
     return stringify(flattenJson(parsed, { separator }), indent, sortKeys);

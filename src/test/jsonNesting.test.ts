@@ -579,3 +579,33 @@ describe('the two separators a JSON file is usually joined with', () => {
     }
   });
 });
+
+describe('a document that is already flat', () => {
+  // What the converter leans on when it hands such a file straight back rather
+  // than asking the separator: there is nothing to join, so every separator
+  // produces the same bytes, and the one in the keys cannot be made ambiguous.
+  const flatDotnet = Object.freeze({
+    'Serilog:MinimumLevel:Override:Elastic.Apm': 'Warning',
+    'Serilog:MinimumLevel:Override:Microsoft': 'Warning',
+    Timeout: '300'
+  });
+
+  it('is one level deep, dots in its keys notwithstanding', () => {
+    assert.equal(depthOf(flatDotnet), 1);
+  });
+
+  it('flattens to itself under a separator its keys leave free', () => {
+    assert.deepEqual(flattenJson(flatDotnet, { separator: '/' }), flatDotnet);
+  });
+
+  it('still refuses once something in it really is nested', () => {
+    // The dangerous shape the refusal exists for: joining "a" and "b" here
+    // would collide with the key already spelled "a.b".
+    assert.equal(depthOf({ 'a.b': 1, a: { c: 2 } }), 2);
+    assert.throws(() => flattenJson({ 'a.b': 1, a: { c: 2 } }), SyntaxError);
+  });
+
+  it('counts a top-level array as deeper than flat, since indices become keys', () => {
+    assert.deepEqual(flattenJson([{ id: 1 }]), { '0.id': 1 });
+  });
+});
