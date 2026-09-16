@@ -74,9 +74,18 @@ be told from a path: flattening `{ "app": { "v1.2": { "x": 1 } } }` would produc
 `app.v1.2.x`, which nests back four levels deep instead of the three that were
 written. The refusal names a separator the file leaves free and offers to set it for
 you, so one click converts the same file cleanly; `nestify.separator` takes whatever
-character you prefer if you would rather choose it yourself. Keys that clash, contain an empty segment, or use the reserved
-name `__proto__` are refused too, in both directions, and the message names the key at
-fault. Whatever flattens can be nested back.
+character you prefer if you would rather choose it yourself. Keys that clash, contain
+an empty segment, or use the reserved name `__proto__` are refused too, in both
+directions, and the message names the key at fault. Whatever flattens can be nested
+back.
+
+Nesting makes the same offer from the other side. A file whose keys are joined with
+something other than your separator — a .NET `appsettings.json`, whose paths use `:`
+and whose last segment is a dotted namespace like
+`Serilog:MinimumLevel:Override:Microsoft.Extensions.Diagnostics` — is refused under
+`.`, since the namespace splits and collides with the key beside it. The message
+offers the `:` those keys are actually written with, under which the file nests
+cleanly.
 
 ## Contributing
 
