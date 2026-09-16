@@ -33,8 +33,13 @@ const UNSAFE_SEGMENT = '__proto__';
  * Separators offered when the file's own keys rule the current one out, in the
  * order they are tried. Every one of them is a character a key path can hold,
  * so the only thing that disqualifies a candidate is the file itself.
+ *
+ * "." is among them, and first: a setting moved to ":" for a .NET config has to
+ * be offered its way back when the next file is the dot-joined one every other
+ * tool writes. The separator in force is never offered, so the default never
+ * suggests itself.
  */
-const CANDIDATE_SEPARATORS = ['/', '_', ':', '|', '~', '::', '->'];
+const CANDIDATE_SEPARATORS = ['.', '/', '_', ':', '|', '~', '::', '->'];
 
 /**
  * Flattening refused because a key already contains the separator.

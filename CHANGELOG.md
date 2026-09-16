@@ -6,6 +6,14 @@ All notable changes to Nestify are documented in this file.
 
 ### Added
 
+- `.` is offered as a separator like any other, so a setting moved to `:` for a
+  .NET config is offered its way back the next time the file is the dot-joined
+  kind every other tool writes.
+- Nesting a file whose keys contain no separator at all no longer hands it back
+  unchanged in silence. When another separator would really nest it — a
+  dot-joined file while the setting says `:` — it says so and offers that one;
+  a file that is already nested still converts quietly, as does anything just
+  round-tripped.
 - Nesting refused over a key conflict now names the separator the keys are
   actually joined with and offers to set it, the way flattening already did.
   A .NET `appsettings.json` — paths joined with `:`, last segment a namespace
