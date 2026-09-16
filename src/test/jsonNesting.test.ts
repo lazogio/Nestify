@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { depthOf, flattenJson, unflattenJson } from '../jsonNesting';
+import { depthOf, flattenJson, sortKeysDeep, unflattenJson } from '../jsonNesting';
 
 /** The thrown message, so a test can assert on what the user would read. */
 function messageFrom(run: () => unknown): string {
@@ -135,11 +135,41 @@ describe('unflattenJson', () => {
     });
   });
 
-  it('rebuilds numeric segments as object keys, not arrays', () => {
-    const nested = unflattenJson({ 'tags.0': 'a' }) as { tags: unknown };
+  describe('index keys', () => {
+    it('rebuilds the array they were flattened from', () => {
+      assert.deepEqual(unflattenJson({ 'tags.0': 'a', 'tags.1': 'b' }), { tags: ['a', 'b'] });
+    });
 
-    assert.deepEqual(nested, { tags: { 0: 'a' } });
-    assert.equal(Array.isArray(nested.tags), false);
+    it('rebuilds one that arrived out of order', () => {
+      assert.deepEqual(unflattenJson({ 'tags.1': 'b', 'tags.0': 'a' }), { tags: ['a', 'b'] });
+    });
+
+    it('rebuilds an array at the top level', () => {
+      assert.deepEqual(unflattenJson({ '0': 'a', '1': 'b' }), ['a', 'b']);
+    });
+
+    it('leaves a gap as an object, no array being able to hold it', () => {
+      assert.deepEqual(unflattenJson({ 'tags.0': 'a', 'tags.2': 'c' }), {
+        tags: { 0: 'a', 2: 'c' }
+      });
+    });
+
+    it('leaves keys that only look like indices', () => {
+      assert.deepEqual(unflattenJson({ 'tags.01': 'a' }), { tags: { '01': 'a' } });
+      assert.deepEqual(unflattenJson({ 'tags.1': 'b' }), { tags: { 1: 'b' } });
+    });
+
+    it('keeps every container an object when asked to', () => {
+      assert.deepEqual(unflattenJson({ 'tags.0': 'a' }, { arrays: 'objects' }), {
+        tags: { 0: 'a' }
+      });
+    });
+
+    it('leaves a value that was already an object alone', () => {
+      // The value came verbatim from the flat document, so it is not Nestify's
+      // to reshape — only the containers nesting itself built are.
+      assert.deepEqual(unflattenJson({ 'a.b': { 0: 'x' } }), { a: { b: { 0: 'x' } } });
+    });
   });
 
   it('honours a custom separator', () => {
@@ -231,6 +261,40 @@ describe('depthOf', () => {
   });
 });
 
+describe('sortKeysDeep', () => {
+  it("puts an object's keys in order", () => {
+    assert.deepEqual(Object.keys(sortKeysDeep({ b: 1, a: 2, c: 3 }) as object), ['a', 'b', 'c']);
+  });
+
+  it('reaches every level', () => {
+    const sorted = sortKeysDeep({ b: { d: 1, c: 2 }, a: 3 }) as Record<string, object>;
+
+    assert.deepEqual(Object.keys(sorted), ['a', 'b']);
+    assert.deepEqual(Object.keys(sorted.b), ['c', 'd']);
+  });
+
+  it('leaves an array in the order it was written', () => {
+    assert.deepEqual(sortKeysDeep({ tags: ['c', 'a', 'b'] }), { tags: ['c', 'a', 'b'] });
+  });
+
+  it('sorts inside the objects an array holds', () => {
+    const sorted = sortKeysDeep([{ b: 1, a: 2 }]) as Record<string, unknown>[];
+
+    assert.deepEqual(Object.keys(sorted[0]), ['a', 'b']);
+  });
+
+  it('changes no value, only the order', () => {
+    const original = { b: 1, a: [{ d: null, c: false }] };
+
+    assert.deepEqual(sortKeysDeep(original), original);
+  });
+
+  it('passes a scalar straight through', () => {
+    assert.equal(sortKeysDeep('nestify'), 'nestify');
+    assert.equal(sortKeysDeep(null), null);
+  });
+});
+
 describe('round trips', () => {
   it('returns objects unchanged when they hold no arrays', () => {
     const original = { app: { name: 'nestify', window: { width: 800 } }, debug: false };
@@ -244,9 +308,16 @@ describe('round trips', () => {
     assert.deepEqual(unflattenJson(flattenJson(original)), original);
   });
 
-  it('turns arrays into objects on the way back, as documented', () => {
-    assert.deepEqual(unflattenJson(flattenJson({ tags: ['a', 'b'] })), {
-      tags: { 0: 'a', 1: 'b' }
+  it('returns arrays unchanged too', () => {
+    const original = { tags: ['a', 'b'], nested: { items: [{ id: 1 }] } };
+
+    assert.deepEqual(unflattenJson(flattenJson(original)), original);
+  });
+
+  it('returns objects of index-like keys as arrays, the one shape it cannot tell apart', () => {
+    assert.deepEqual(unflattenJson(flattenJson({ lookup: { 0: 'a' } })), { lookup: ['a'] });
+    assert.deepEqual(unflattenJson(flattenJson({ lookup: { 0: 'a' } }), { arrays: 'objects' }), {
+      lookup: { 0: 'a' }
     });
   });
 });

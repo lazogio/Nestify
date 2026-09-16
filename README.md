@@ -32,10 +32,12 @@ Then pick whichever is closest to hand:
 - **Sidebar** — the Nestify icon in the Activity Bar lists every converter; click one to run it.
   It states what would be converted — key count and nesting depth of the file or your
   selection — and a converter that would not help right now says why instead of offering itself.
+  Hovering a row reveals a copy button, which puts the result on the clipboard and leaves
+  the file alone. `Nestify: Copy Converted…` does the same from the Command Palette.
 
 Converting a selection leaves it selected, so you can see what changed; converting a
-whole file puts the cursor at the top of it. Invalid JSON changes nothing and tells
-you what is wrong.
+whole file puts the cursor at the top of it. Invalid JSON changes nothing, tells you
+what is wrong, and puts the cursor on the character the parser stopped at.
 
 JSON with comments is not supported: the conversion is written back with
 `JSON.stringify`, which would drop every comment in the file.
@@ -45,19 +47,26 @@ No shortcuts are bundled, so nothing of yours is overridden. To add your own, bi
 
 ## Settings
 
-| Setting             | Default | What it does                                        |
-| ------------------- | ------- | --------------------------------------------------- |
-| `nestify.separator` | `"."`   | Character that joins and splits key paths.          |
-| `nestify.indent`    | `2`     | Spaces used to indent the JSON written back.        |
+| Setting             | Default     | What it does                                              |
+| ------------------- | ----------- | --------------------------------------------------------- |
+| `nestify.separator` | `"."`       | Character that joins and splits key paths.                |
+| `nestify.indent`    | `2`         | Spaces used to indent the JSON written back.              |
+| `nestify.arrays`    | `"rebuild"` | Whether nesting rebuilds arrays from index keys.          |
+| `nestify.sortKeys`  | `false`     | Write each object's keys in order.                        |
 
 If your keys already contain dots, set `nestify.separator` to `"/"` or `"_"`.
 
 ## One thing to know about arrays
 
 Flattening an array turns each index into a path segment, so `{ "tags": ["a"] }`
-becomes `{ "tags.0": "a" }`. Nesting it back produces `{ "tags": { "0": "a" } }` — an
-object, not an array. This is deliberate: it keeps gaps and out-of-order numeric keys
-intact. If you round-trip arrays, expect objects on the way back.
+becomes `{ "tags.0": "a" }`, and nesting turns it back into the array it came from.
+Keys that are not exactly the indices `0…n-1` — a gap, or `"01"` — stay an object,
+since no array could hold them without inventing values.
+
+The one shape this cannot tell apart is an object whose keys already are `"0"`, `"1"`,
+… : it flattens the same way an array does, so it comes back as an array. Set
+`nestify.arrays` to `"objects"` if that is your data, and every container stays an
+object on the way back.
 
 Keys that clash, contain an empty segment, or use the reserved name `__proto__` are
 refused in both directions, and the message names the key at fault. That includes

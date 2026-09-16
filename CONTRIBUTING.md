@@ -19,9 +19,11 @@ src/
   jsonNesting.ts                   pure flattenJson() / unflattenJson() / depthOf(), no vscode import
   converters/
     registry.ts                    Converter registry (id, title, run)
+    jsonSource.ts                  parses editor text, with the offset a bad parse stopped at
     jsonFlattenConverters.ts       registers "flatten" and "unflatten"
   test/
     jsonNesting.test.ts            node:test suite over the pure helpers
+    jsonSource.test.ts             node:test suite over the parse offsets
 ```
 
 `jsonNesting.ts` imports nothing from `vscode`, so the conversion logic stays testable

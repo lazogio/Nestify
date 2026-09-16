@@ -57,7 +57,8 @@ export class ConverterTreeProvider implements vscode.TreeDataProvider<Converter>
     item.description = blocked ?? converter.hint;
     item.iconPath = new vscode.ThemeIcon(themeIconFor(converter.id));
     item.tooltip = tooltipFor(converter, blocked);
-    // The whole row is the button, so no inline action competes with it.
+    // The whole row runs the conversion; copying it to the clipboard instead is
+    // the one inline action beside it, which hover reveals.
     item.command = {
       command: 'nestify.runConverter',
       title: converter.title,

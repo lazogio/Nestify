@@ -38,6 +38,15 @@ All notable changes to Nestify are documented in this file.
 
 ### Added
 
+- Nesting rebuilds arrays: `{ "tags.0": "a" }` comes back as `{ "tags": ["a"] }`,
+  where the keys are exactly the indices `0…n-1`. Gaps and keys such as `"01"`
+  stay objects. `nestify.arrays: "objects"` keeps the previous behaviour, which
+  is what a document of index-like keys wants.
+- `nestify.sortKeys` writes each object's keys in order, for a diff that does not
+  depend on where a key was written. Arrays keep their order.
+- `Nestify: Copy Converted…` puts the result on the clipboard and leaves the file
+  alone. The Activity Bar rows carry it as a hover action.
+- Invalid JSON now puts the cursor on the character the parser stopped at.
 - Unit tests for `flattenJson` / `unflattenJson`, run with `npm test`.
 
 ## [0.0.3] - 2026-09-15
