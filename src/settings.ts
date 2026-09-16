@@ -28,3 +28,25 @@ export function readSettings(resource?: vscode.Uri): NestifySettings {
     sortKeys: config.get<boolean>('sortKeys', false) === true
   };
 }
+
+/**
+ * Records the separator the user accepted from a refused conversion.
+ *
+ * Written rather than applied to the one conversion: flattening with a
+ * separator that nesting would not read back is exactly the mismatch the
+ * refusal exists to prevent, so both directions have to move together.
+ */
+export async function writeSeparator(
+  resource: vscode.Uri | undefined,
+  separator: string
+): Promise<void> {
+  const config = vscode.workspace.getConfiguration('nestify', resource);
+  // The keys that needed it belong to this project, so the choice is stored
+  // with it. With no folder open there is nowhere to put it but the user's own
+  // settings.
+  const target = vscode.workspace.workspaceFolders?.length
+    ? vscode.ConfigurationTarget.Workspace
+    : vscode.ConfigurationTarget.Global;
+
+  await config.update('separator', separator, target);
+}

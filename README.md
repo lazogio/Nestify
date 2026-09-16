@@ -72,8 +72,9 @@ container stays an object on the way back.
 A key that already contains the separator is refused, because once joined it cannot
 be told from a path: flattening `{ "app": { "v1.2": { "x": 1 } } }` would produce
 `app.v1.2.x`, which nests back four levels deep instead of the three that were
-written. Set `nestify.separator` to a character your keys do not contain and the same
-file converts cleanly. Keys that clash, contain an empty segment, or use the reserved
+written. The refusal names a separator the file leaves free and offers to set it for
+you, so one click converts the same file cleanly; `nestify.separator` takes whatever
+character you prefer if you would rather choose it yourself. Keys that clash, contain an empty segment, or use the reserved
 name `__proto__` are refused too, in both directions, and the message names the key at
 fault. Whatever flattens can be nested back.
 

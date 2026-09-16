@@ -3,6 +3,8 @@ import { ConversionTarget, conversionTarget, targetEditor, trackActiveEditor } f
 import { ConversionError } from './converters/jsonSource';
 import { Converter, getConverter, listConverters, requireConverter } from './converters/registry';
 import { ConverterTreeProvider } from './converterTreeView';
+import { SeparatorConflictError } from './jsonNesting';
+import { writeSeparator } from './settings';
 
 // Imported for the side effect: the module registers the JSON converters.
 // A new converter module only has to be imported here as well.
@@ -135,7 +137,7 @@ async function copyConverted(target?: unknown): Promise<void> {
     return;
   }
 
-  const converted = convert(converter, where);
+  const converted = convert(converter, where, () => copyConverted(converter));
 
   if (converted === undefined) {
     return;
@@ -189,7 +191,11 @@ function targetOrComplain(): ConversionTarget | undefined {
  * Runs the converter, or reports why it could not and puts the cursor on the
  * character the parser stopped at, which beats hunting for it by hand.
  */
-function convert(converter: Converter, target: ConversionTarget): string | undefined {
+function convert(
+  converter: Converter,
+  target: ConversionTarget,
+  retry: () => Promise<void>
+): string | undefined {
   try {
     // The document travels with the text, so settings a folder or a language
     // overrides are read for the file being converted.
@@ -197,10 +203,54 @@ function convert(converter: Converter, target: ConversionTarget): string | undef
       resource: target.editor.document.uri
     });
   } catch (error) {
-    vscode.window.showErrorMessage(reportable(error));
     revealProblem(target, error);
+    // The conversion is over either way; the offer is a notification the user
+    // answers in their own time, so it is not waited on here. It swallows its
+    // own failures rather than rejecting into the event loop, where an
+    // unhandled rejection would be all the user saw of a report that a
+    // conversion had failed.
+    void reportFailure(target, error, retry).catch(() => undefined);
     return undefined;
   }
+}
+
+/**
+ * Reports a failed conversion, and offers a separator that would work when the
+ * file refused the current one.
+ *
+ * A key holding the separator is the one refusal the user cannot act on without
+ * knowing which character the whole file leaves free, which is why it is worth
+ * a button rather than the advice to go and look.
+ */
+async function reportFailure(
+  target: ConversionTarget,
+  error: unknown,
+  retry: () => Promise<void>
+): Promise<void> {
+  const message = reportable(error);
+  const suggestion = error instanceof SeparatorConflictError ? error.suggestion : undefined;
+
+  if (suggestion === undefined) {
+    await vscode.window.showErrorMessage(message);
+    return;
+  }
+
+  // Spelled out, because accepting it writes to the user's settings rather than
+  // converting this once.
+  const accept = `Set separator to "${suggestion}" and convert`;
+
+  if ((await vscode.window.showErrorMessage(message, accept)) !== accept) {
+    return;
+  }
+
+  try {
+    await writeSeparator(target.editor.document.uri, suggestion);
+  } catch (failure) {
+    vscode.window.showErrorMessage(reportable(failure));
+    return;
+  }
+
+  await retry();
 }
 
 function revealProblem(target: ConversionTarget, error: unknown): void {
@@ -243,7 +293,7 @@ async function applyConverter(converter: Converter): Promise<void> {
 
   const { editor, range, hadSelection } = target;
   const document = editor.document;
-  const converted = convert(converter, target);
+  const converted = convert(converter, target, () => applyConverter(converter));
 
   if (converted === undefined) {
     return;

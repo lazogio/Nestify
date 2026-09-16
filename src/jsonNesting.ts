@@ -29,6 +29,34 @@ const DEFAULT_SEPARATOR = '.';
  */
 const UNSAFE_SEGMENT = '__proto__';
 
+/**
+ * Separators offered when the file's own keys rule the current one out, in the
+ * order they are tried. Every one of them is a character a key path can hold,
+ * so the only thing that disqualifies a candidate is the file itself.
+ */
+const CANDIDATE_SEPARATORS = ['/', '_', ':', '|', '~', '::', '->'];
+
+/**
+ * Flattening refused because a key already contains the separator.
+ *
+ * It carries the key at fault and, when the file leaves one free, a separator
+ * that would convert cleanly, so the editor can offer that rather than leaving
+ * the user to guess which character their keys do not use.
+ */
+export class SeparatorConflictError extends SyntaxError {
+  readonly key: string;
+  readonly separator: string;
+  readonly suggestion?: string;
+
+  constructor(message: string, key: string, separator: string, suggestion?: string) {
+    super(message);
+    this.name = 'SeparatorConflictError';
+    this.key = key;
+    this.separator = separator;
+    this.suggestion = suggestion;
+  }
+}
+
 function resolveSeparator(separator: string | undefined): string {
   const value = separator ?? DEFAULT_SEPARATOR;
   if (typeof value !== 'string' || value.length === 0) {
@@ -60,7 +88,7 @@ function isContainer(value: unknown): value is Record<string, unknown> | unknown
  * an empty segment, or `__proto__`.
  */
 export function flattenJson(input: unknown, options: NestingOptions = {}): FlatJson {
-  const leaves = collectLeaves(input, options);
+  const leaves = collectLeavesSuggesting(input, options);
 
   // `Object.fromEntries` defines each key as an own property whatever it is
   // called, where a plain `result[key] = …` would treat some names as
@@ -76,7 +104,7 @@ export function flattenJson(input: unknown, options: NestingOptions = {}): FlatJ
  * object and its key list to count them.
  */
 export function countFlatKeys(input: unknown, options: NestingOptions = {}): number {
-  return collectLeaves(input, options).size;
+  return collectLeavesSuggesting(input, options).size;
 }
 
 function collectLeaves(input: unknown, options: NestingOptions): Flattening['leaves'] {
@@ -91,6 +119,106 @@ function collectLeaves(input: unknown, options: NestingOptions): Flattening['lea
   walk(input, [], into);
 
   return into.leaves;
+}
+
+/**
+ * The walk, with a separator that would work named in the refusal.
+ *
+ * Separate from `collectLeaves` so that `suggestSeparator` can try a candidate
+ * through the bare collector: enriching there would have it ask for a
+ * suggestion while answering that same question.
+ */
+function collectLeavesSuggesting(input: unknown, options: NestingOptions): Flattening['leaves'] {
+  try {
+    return collectLeaves(input, options);
+  } catch (error) {
+    // The walk sees one key at a time; which separator would work is a question
+    // about every key in the document, so it is answered out here.
+    if (error instanceof SeparatorConflictError) {
+      throw separatorConflict(error.key, error.separator, suggestSeparator(input, error.separator));
+    }
+
+    throw error;
+  }
+}
+
+/** The refusal, worded around a separator that would work when one is left. */
+function separatorConflict(
+  key: string,
+  separator: string,
+  suggestion?: string
+): SeparatorConflictError {
+  const advice = suggestion
+    ? `No key here contains "${suggestion}", so that one would convert cleanly.`
+    : 'Set the separator to a character your keys do not contain.';
+
+  return new SeparatorConflictError(
+    `Nestify: the key "${key}" already contains the separator "${separator}", so ` +
+      `flattening it would read as a path and could not be nested back. ${advice}`,
+    key,
+    separator,
+    suggestion
+  );
+}
+
+/**
+ * A separator no key in `input` contains, or `undefined` when the document uses
+ * every candidate. Anything it returns flattens without a clash: a separator
+ * absent from every key cannot be mistaken for one.
+ */
+export function suggestSeparator(input: unknown, current?: string): string | undefined {
+  const keys = [...collectKeys(input)];
+
+  for (const candidate of CANDIDATE_SEPARATORS) {
+    if (candidate === current || keys.some((key) => key.includes(candidate))) {
+      continue;
+    }
+
+    try {
+      // The key scan above rules out the clash this candidate was chosen to
+      // avoid; flattening for real also rules out everything else the document
+      // could be refused for, so what is offered is an offer that converts.
+      collectLeaves(input, { separator: candidate });
+      return candidate;
+    } catch {
+      // Refused for a reason no separator can fix, such as a "__proto__" key.
+      // Saying so plainly beats a button that fails on the next press.
+      return undefined;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Every object key in the document. An explicit stack rather than recursion:
+ * this runs over whatever the user opened, and the depth that would overflow is
+ * theirs to choose.
+ */
+function collectKeys(input: unknown): Set<string> {
+  const keys = new Set<string>();
+  const stack: unknown[] = [input];
+
+  while (stack.length > 0) {
+    const value = stack.pop();
+
+    if (Array.isArray(value)) {
+      // An index is digits, so it rules no candidate out; only its items matter.
+      for (const item of value) {
+        stack.push(item);
+      }
+      continue;
+    }
+
+    if (isPlainObject(value)) {
+      for (const key of Object.keys(value)) {
+        keys.add(key);
+        stack.push(value[key]);
+      }
+    }
+  }
+
+  return keys;
 }
 
 /** The state a single `flattenJson` call threads through its recursion. */
@@ -164,11 +292,7 @@ function rejectWhatCannotBeNestedBack(path: string[], flatKey: string, separator
   const joined = path.find((segment) => segment.includes(separator));
 
   if (joined !== undefined) {
-    throw new SyntaxError(
-      `Nestify: the key "${joined}" already contains the separator "${separator}", so ` +
-        'flattening it would read as a path and could not be nested back. Set the ' +
-        'separator to a character your keys do not contain.'
-    );
+    throw separatorConflict(joined, separator);
   }
 
   if (path.includes(UNSAFE_SEGMENT)) {

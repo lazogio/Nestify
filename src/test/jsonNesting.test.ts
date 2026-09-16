@@ -1,6 +1,26 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { countFlatKeys, depthOf, flattenJson, sortKeysDeep, unflattenJson } from '../jsonNesting';
+import {
+  countFlatKeys,
+  depthOf,
+  flattenJson,
+  SeparatorConflictError,
+  sortKeysDeep,
+  suggestSeparator,
+  unflattenJson
+} from '../jsonNesting';
+
+/** The error itself, for the fields the editor reads off it. */
+function errorFrom(run: () => unknown): SeparatorConflictError {
+  try {
+    run();
+  } catch (error) {
+    assert.ok(error instanceof SeparatorConflictError, 'expected a SeparatorConflictError');
+    return error;
+  }
+
+  assert.fail('expected the call to throw');
+}
 
 /** The thrown message, so a test can assert on what the user would read. */
 function messageFrom(run: () => unknown): string {
@@ -371,5 +391,66 @@ describe('round trips', () => {
     assert.deepEqual(unflattenJson(flattenJson({ lookup: { 0: 'a' } }), { arrays: 'objects' }), {
       lookup: { 0: 'a' }
     });
+  });
+});
+
+describe('the separator a refused document could use', () => {
+  it('rides the refusal, so the editor can offer it', () => {
+    const error = errorFrom(() => flattenJson(JSON.parse('{"app.title": "Hi"}')));
+
+    assert.ok(error instanceof SeparatorConflictError);
+    assert.equal(error.key, 'app.title');
+    assert.equal(error.separator, '.');
+    assert.equal(error.suggestion, '/');
+    assert.match(error.message, /No key here contains "\/"/);
+  });
+
+  it('skips a candidate the document already uses', () => {
+    assert.equal(suggestSeparator({ 'a.b': 1, 'c/d': 2 }), '_');
+  });
+
+  it('reads every key, not only the one that was refused', () => {
+    // The offer has to hold for the whole document: "/" is free at the top and
+    // taken further down, so suggesting it would refuse again on the next key.
+    assert.equal(suggestSeparator({ 'a.b': 1, nested: { 'c/d': 2 } }), '_');
+  });
+
+  it('looks inside arrays, whose items carry keys of their own', () => {
+    assert.equal(suggestSeparator({ rows: [{ 'a/b': 1 }] }), '_');
+  });
+
+  it('never offers the separator that was just refused', () => {
+    assert.notEqual(suggestSeparator({ 'a/b': 1 }, '/'), '/');
+  });
+
+  it('offers nothing, and says so, when every candidate occurs', () => {
+    const keys = JSON.parse(
+      '{"a.b": 1, "c/d": 2, "e_f": 3, "g:h": 4, "i|j": 5, "k~l": 6, "m::n": 7, "o->p": 8}'
+    );
+
+    assert.equal(suggestSeparator(keys), undefined);
+
+    const message = messageFrom(() => flattenJson(keys));
+
+    assert.match(message, /Set the separator to a character your keys do not contain/);
+  });
+
+  it('offers nothing when no separator could rescue the document', () => {
+    // "__proto__" is refused whatever the separator, so a button offering one
+    // would fail on the next press.
+    const document = JSON.parse('{"a.b": 1, "__proto__": {"x": 2}}');
+
+    assert.equal(suggestSeparator(document, '.'), undefined);
+  });
+
+  it('offers one that flattens and nests back without complaint', () => {
+    const document = JSON.parse('{"app.title": "Hi", "app": {"sub": "Yo"}}');
+    const separator = suggestSeparator(document, '.');
+
+    assert.ok(separator);
+
+    const flat = flattenJson(document, { separator });
+
+    assert.deepEqual(unflattenJson(flat, { separator }), document);
   });
 });

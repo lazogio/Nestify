@@ -2,6 +2,17 @@
 
 All notable changes to Nestify are documented in this file.
 
+## [0.0.5] - Unreleased
+
+### Added
+
+- A flatten refused because a key already contains the separator now names one
+  the document leaves free and offers to set it, so the conversion the refusal
+  blocked is a click away. Both directions move together: the separator is
+  written to your settings rather than applied to the one conversion, since
+  flattening with a separator nesting would not read back is the mismatch the
+  refusal exists to prevent.
+
 ## [0.0.4] - 2026-09-16
 
 ### Fixed
