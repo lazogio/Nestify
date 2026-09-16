@@ -26,7 +26,8 @@ src/
 
 `jsonNesting.ts` imports nothing from `vscode`, so the conversion logic stays testable
 on its own. `npm test` compiles the project and runs `node --test` over `out/test`;
-tests are kept out of the published `.vsix` by `.vscodeignore`.
+tests are kept out of the published `.vsix` by `.vscodeignore`. The same command runs
+in CI (`.github/workflows/ci.yml`) on every push to `main` and every pull request.
 
 ## Adding a converter
 
