@@ -1,5 +1,6 @@
 import { conversionTarget } from './activeEditor';
 import { countFlatKeys, depthOf } from './jsonNesting';
+import { holdsJson } from './jsonString';
 import { readSettings } from './settings';
 
 /** What the view knows about the text a conversion would run on. */
@@ -16,6 +17,12 @@ export interface ActiveJsonSummary {
    * still has a key to nest.
    */
   readonly joinedKeys?: boolean;
+  /**
+   * Whether the text is a JSON string holding a document, i.e. whether there
+   * is a layer of escaping to take off. Depth and key count say nothing about
+   * it: a string is a scalar however much JSON it spells.
+   */
+  readonly jsonString?: boolean;
 }
 
 // Parsing runs on every keystroke in the active file, so skip pathological sizes.
@@ -53,8 +60,20 @@ export function summariseActiveJson(): ActiveJsonSummary {
     return { problem: `The ${scope} is not valid JSON.` };
   }
 
+  // A string is a scalar by shape and still the one thing Parse JSON String
+  // converts, so it is read before the refusal below would turn it away.
+  if (holdsJson(parsed)) {
+    return {
+      headerDetail: hadSelection ? 'Selection: JSON string' : 'JSON string',
+      jsonString: true
+    };
+  }
+
   if (typeof parsed !== 'object' || parsed === null) {
-    return { problem: `The ${scope} is a single value, not an object or array.` };
+    return {
+      problem: `The ${scope} is a single value, not an object or array.`,
+      jsonString: false
+    };
   }
 
   const { separator } = readSettings(editor.document.uri);
@@ -88,7 +107,8 @@ export function summariseActiveJson(): ActiveJsonSummary {
     // the two numbers a conversion changes.
     headerDetail: hadSelection ? `Selection: ${keys} · ${nesting}` : `${keys} · ${nesting}`,
     shape: depth <= 1 ? 'flat' : 'nested',
-    joinedKeys: hasJoinedKeys(parsed, separator)
+    joinedKeys: hasJoinedKeys(parsed, separator),
+    jsonString: false
   };
 }
 

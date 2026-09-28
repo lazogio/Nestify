@@ -2,6 +2,26 @@
 
 All notable changes to Nestify are documented in this file.
 
+## [0.0.8] - 2026-09-28
+
+### Added
+
+- `Nestify: Parse JSON String` reads the document a JSON string holds, for the
+  JSON that arrives escaped inside one value — a log line, a database column, a
+  webhook field. `"{\"app\":{\"name\":\"nestify\"}}"` becomes the object it
+  spells. A fragment whose surrounding quotes were lost on the way out of a log
+  viewer is taken as well: text still carrying an escaped quote can only have
+  been a string, and without that tell nothing is assumed.
+- `Nestify: Stringify JSON` goes the other way, wrapping the document in the
+  string literal that carries it, so whatever stringifies parses back. The
+  literal is written on one line whatever `nestify.indent` says — it exists to
+  sit inside another document, where an indented body would come back as a run
+  of `\n` to read around.
+- The sidebar reads a JSON string as one, stating `JSON string` in its header
+  rather than refusing the file as "a single value, not an object or array",
+  and the parse row says `not a JSON string` where there is no layer to take
+  off.
+
 ## [0.0.7] - 2026-09-16
 
 ### Fixed

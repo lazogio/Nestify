@@ -43,7 +43,30 @@ JSON with comments is not supported: the conversion is written back with
 `JSON.stringify`, which would drop every comment in the file.
 
 No shortcuts are bundled, so nothing of yours is overridden. To add your own, bind
-`nestify.flatten` or `nestify.unflatten` in **Keyboard Shortcuts**.
+`nestify.flatten`, `nestify.unflatten`, `nestify.parseString`, or
+`nestify.stringify` in **Keyboard Shortcuts**.
+
+## JSON that arrived as a string
+
+JSON often travels escaped inside a single value — a log line, a database column,
+a webhook field. **Nestify: Parse JSON String** takes that layer off:
+
+```jsonc
+// before                                  // after "Nestify: Parse JSON String"
+"{\"app\":{\"name\":\"nestify\"}}"         {
+                                             "app": { "name": "nestify" }
+                                           }
+```
+
+**Nestify: Stringify JSON** goes back the other way, so whatever stringifies parses
+back. The literal it writes stays on one line whatever `nestify.indent` says, since
+it exists to sit inside another document, where an indented body would come back as
+a run of `\n` to read around.
+
+If the surrounding quotes were lost on the way out of a log viewer, paste the
+fragment as it is — `{\"app\":{\"name\":\"nestify\"}}` is taken too. Text still
+carrying an escaped quote can only have been a string; without that tell, nothing
+is assumed and the text is left alone.
 
 ## Settings
 
