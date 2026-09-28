@@ -34,7 +34,12 @@ The layering exists so the conversion logic is testable without VS Code — keep
 
 - `src/jsonNesting.ts` — pure `flattenJson` / `unflattenJson` / `depthOf` /
   `countFlatKeys` / `sortKeysDeep`. **No `vscode` import.** Everything under test
-  lives here.
+  lives here. Separator refusals throw `SeparatorConflictError` (flatten) or
+  `NestingConflictError` (unflatten), each carrying a `suggestion` picked from
+  `CANDIDATE_SEPARATORS` that would convert this file cleanly. `extension.ts` reads
+  it via `suggestedSeparator()` and offers a button that calls `writeSeparator()`
+  and retries. A new refusal over the separator should carry a suggestion the same
+  way.
 - `src/converters/jsonSource.ts` — `parseJsonSource()` and `ConversionError`, which
   carries the offset a bad parse stopped at. Also **no `vscode` import**, so the
   offset arithmetic (it compensates for leading whitespace trimmed before
