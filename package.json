@@ -49,6 +49,18 @@
         "icon": "$(list-tree)"
       },
       {
+        "command": "nestify.parseString",
+        "title": "Parse JSON String",
+        "category": "Nestify",
+        "icon": "$(json)"
+      },
+      {
+        "command": "nestify.stringify",
+        "title": "Stringify JSON",
+        "category": "Nestify",
+        "icon": "$(quote)"
+      },
+      {
         "command": "nestify.convert",
         "title": "Convert With…",
         "category": "Nestify",
@@ -99,6 +111,14 @@
         },
         {
           "command": "nestify.unflatten",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "nestify.parseString",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "nestify.stringify",
           "when": "editorIsOpen"
         },
         {
