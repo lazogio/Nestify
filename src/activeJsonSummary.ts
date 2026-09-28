@@ -1,6 +1,6 @@
 import { conversionTarget } from './activeEditor';
 import { countFlatKeys, depthOf } from './jsonNesting';
-import { holdsJson } from './jsonString';
+import { holdsJsonDocument } from './jsonString';
 import { readSettings } from './settings';
 
 /** What the view knows about the text a conversion would run on. */
@@ -52,21 +52,23 @@ export function summariseActiveJson(): ActiveJsonSummary {
     return { headerDetail: `${scope} · too large to measure` };
   }
 
+  // Asked before the parse below, not after it. Parse JSON String also takes a
+  // fragment whose surrounding quotes were stripped, which is not valid JSON on
+  // its own, so a header that waited for the parse called the file unconvertible
+  // while the row beneath it converted the thing fine.
+  if (holdsJsonDocument(text)) {
+    return {
+      headerDetail: hadSelection ? 'Selection: JSON string' : 'JSON string',
+      jsonString: true
+    };
+  }
+
   let parsed: unknown;
 
   try {
     parsed = JSON.parse(text.trim());
   } catch {
-    return { problem: `The ${scope} is not valid JSON.` };
-  }
-
-  // A string is a scalar by shape and still the one thing Parse JSON String
-  // converts, so it is read before the refusal below would turn it away.
-  if (holdsJson(parsed)) {
-    return {
-      headerDetail: hadSelection ? 'Selection: JSON string' : 'JSON string',
-      jsonString: true
-    };
+    return { problem: `The ${scope} is not valid JSON.`, jsonString: false };
   }
 
   if (typeof parsed !== 'object' || parsed === null) {

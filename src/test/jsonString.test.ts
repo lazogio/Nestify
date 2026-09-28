@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { holdsJson, parseEmbeddedJson, toJsonStringLiteral } from '../jsonString';
+import { holdsJsonDocument, parseEmbeddedJson, toJsonStringLiteral } from '../jsonString';
 
 /** The thrown message, so a test can assert on what the user would read. */
 function messageFrom(run: () => unknown): string {
@@ -49,6 +49,22 @@ describe('parseEmbeddedJson', () => {
     assert.match(messageFrom(() => parseEmbeddedJson('"hello"')), /does not hold JSON/);
   });
 
+  it('leaves a quoted id alone rather than handing back a different number', () => {
+    // Unwrapped it parses to 1234567890123456800, which is not the id that was
+    // written: the quotes are what kept its digits exact.
+    const message = messageFrom(() => parseEmbeddedJson('"1234567890123456789"'));
+
+    assert.match(message, /not a JSON object or array/);
+    assert.match(message, /keeps its digits/);
+  });
+
+  it('refuses a string around any bare scalar, which is data rather than a document', () => {
+    assert.match(messageFrom(() => parseEmbeddedJson('"1e5"')), /holds a number/);
+    assert.match(messageFrom(() => parseEmbeddedJson('"true"')), /holds a boolean/);
+    assert.match(messageFrom(() => parseEmbeddedJson('"null"')), /holds null/);
+    assert.match(messageFrom(() => parseEmbeddedJson('"\\"hi\\""')), /holds a string/);
+  });
+
   it('keeps the parser\'s complaint for text that is not JSON at all', () => {
     assert.match(messageFrom(() => parseEmbeddedJson('{')), /not valid JSON/);
   });
@@ -70,23 +86,45 @@ describe('toJsonStringLiteral', () => {
   });
 
   it('round-trips through parseEmbeddedJson', () => {
-    for (const value of [{ app: { name: 'nestify' } }, [1, { a: null }], 'hi', 42, {}]) {
+    // Scalars are left out on purpose: the pair converts documents, and
+    // parseEmbeddedJson refuses a string around a bare value.
+    for (const value of [{ app: { name: 'nestify' } }, [1, { a: null }], {}, []]) {
       assert.deepEqual(parseEmbeddedJson(toJsonStringLiteral(value)), value);
     }
   });
+
+  it('takes one layer off, so a twice-escaped document needs two runs', () => {
+    const once = toJsonStringLiteral({ a: 1 });
+
+    assert.deepEqual(parseEmbeddedJson(once), { a: 1 });
+    // One run hands back the literal that was wrapped, which is a string and is
+    // refused as one rather than being quietly unwrapped twice.
+    assert.match(messageFrom(() => parseEmbeddedJson(toJsonStringLiteral(once))), /holds a string/);
+  });
 });
 
-describe('holdsJson', () => {
-  it('is true for a string holding a document', () => {
-    assert.equal(holdsJson('{"a":1}'), true);
+describe('holdsJsonDocument', () => {
+  it('is true for a string literal around a document', () => {
+    assert.equal(holdsJsonDocument('"{\\"a\\":1}"'), true);
   });
 
-  it('is false for a string holding prose', () => {
-    assert.equal(holdsJson('hello'), false);
+  it('is true for a fragment whose quotes were stripped', () => {
+    // The header would otherwise call this unconvertible while the row converts it.
+    assert.equal(holdsJsonDocument('{\\"a\\":1}'), true);
   });
 
-  it('is false for anything that is not a string', () => {
-    assert.equal(holdsJson({ a: 1 }), false);
-    assert.equal(holdsJson(null), false);
+  it('is false for a string around a bare scalar', () => {
+    assert.equal(holdsJsonDocument('"1234567890123456789"'), false);
+    assert.equal(holdsJsonDocument('"true"'), false);
+  });
+
+  it('is false for JSON that is not escaped at all', () => {
+    assert.equal(holdsJsonDocument('{"a":1}'), false);
+    assert.equal(holdsJsonDocument('{"a":"say \\"hi\\""}'), false);
+  });
+
+  it('is false for prose and for an empty selection', () => {
+    assert.equal(holdsJsonDocument('"hello"'), false);
+    assert.equal(holdsJsonDocument('   '), false);
   });
 });

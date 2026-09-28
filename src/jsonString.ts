@@ -20,9 +20,10 @@ import { parseJsonSource } from './converters/jsonSource';
  */
 export function parseEmbeddedJson(sourceText: string): unknown {
   const embedded = jsonStringIn(sourceText);
+  let parsed: unknown;
 
   try {
-    return JSON.parse(embedded);
+    parsed = JSON.parse(embedded);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
 
@@ -31,6 +32,19 @@ export function parseEmbeddedJson(sourceText: string): unknown {
     // back would put the cursor on the wrong character.
     throw new Error(`The string does not hold JSON: ${reason}`);
   }
+
+  // A string around a bare scalar is data that happens to parse, not a document
+  // that arrived escaped. Unwrapping it changes the value: "1e5" would come back
+  // as 100000, and the id "1234567890123456789" as 1234567890123456800, which is
+  // a different id — the quotes are what kept its digits exact.
+  if (typeof parsed !== 'object' || parsed === null) {
+    throw new Error(
+      `The string holds ${describe(parsed)}, not a JSON object or array. ` +
+        'A quoted value is left as it is, so an id keeps its digits.'
+    );
+  }
+
+  return parsed;
 }
 
 /**
@@ -46,16 +60,26 @@ export function toJsonStringLiteral(value: unknown): string {
 }
 
 /**
- * Whether this value is a string holding JSON, which is the one thing
- * `parseEmbeddedJson` can take. Never throws: the view asks while you type.
+ * Whether Parse JSON String has anything to do here. Never throws: the view
+ * asks while you type.
+ *
+ * It answers by trying the conversion rather than by re-deciding what counts.
+ * Anything else drifts from what the command does — a fragment whose quotes
+ * were stripped is not valid JSON at all, so a header that judged it by parsing
+ * would call the file unconvertible while the row converted it.
  */
-export function holdsJson(value: unknown): boolean {
-  if (typeof value !== 'string') {
+export function holdsJsonDocument(sourceText: string): boolean {
+  const trimmed = sourceText.trim();
+
+  // Cheap bail before a parse that would only throw: this runs on every
+  // keystroke, and text neither opening with a quote nor carrying an escaped
+  // one cannot be a string around a document.
+  if (!trimmed.startsWith('"') && !trimmed.includes('\\"')) {
     return false;
   }
 
   try {
-    JSON.parse(value);
+    parseEmbeddedJson(sourceText);
     return true;
   } catch {
     return false;

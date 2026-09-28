@@ -68,6 +68,12 @@ fragment as it is — `{\"app\":{\"name\":\"nestify\"}}` is taken too. Text stil
 carrying an escaped quote can only have been a string; without that tell, nothing
 is assumed and the text is left alone.
 
+Only an object or an array is unwrapped. A string around a bare value is data that
+happens to parse rather than a document that arrived escaped, and unwrapping it
+would change it: the id `"1234567890123456789"` comes back as
+`1234567890123456800`, and `"1e5"` as `100000`. Those keep their quotes, and the
+refusal says so.
+
 ## Settings
 
 | Setting             | Default     | What it does                                              |

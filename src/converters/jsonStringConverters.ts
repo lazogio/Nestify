@@ -32,12 +32,19 @@ registerConverter({
   example:
     '// before\n{ "app": { "name": "nestify" } }\n\n// after\n"{\\"app\\":{\\"name\\":\\"nestify\\"}}"',
   run(sourceText: string, context?: ConversionContext): string {
-    // No indent here, unlike every other converter: the result is one string
-    // meant to sit inside another document, where an indented body would come
-    // back as a run of "\n" to read around.
     const { sortKeys } = readSettings(context?.resource);
     const parsed = parseJsonSource(sourceText);
 
+    // The document requirement Parse JSON String reads back, so the two stay
+    // exact inverses: a scalar wrapped here would be refused there, since
+    // unwrapping "1e5" hands back 100000 rather than the text that was written.
+    if (typeof parsed !== 'object' || parsed === null) {
+      throw new Error('Stringifying needs a JSON object or array — got a single scalar value.');
+    }
+
+    // No indent here, unlike every other converter: the result is one string
+    // meant to sit inside another document, where an indented body would come
+    // back as a run of "\n" to read around.
     return toJsonStringLiteral(sortKeys ? sortKeysDeep(parsed) : parsed);
   }
 });
