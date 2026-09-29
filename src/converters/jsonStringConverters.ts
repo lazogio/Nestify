@@ -13,6 +13,10 @@ registerConverter({
   example:
     '// before\n"{\\"app\\":{\\"name\\":\\"nestify\\"}}"\n\n// after\n{ "app": { "name": "nestify" } }',
   skipReason(summary): string | undefined {
+    if (summary.envLines) {
+      return 'not JSON';
+    }
+
     return summary.jsonString === false ? 'not a JSON string' : undefined;
   },
   run(sourceText: string, context?: ConversionContext): string {
@@ -31,6 +35,9 @@ registerConverter({
   icon: 'quote',
   example:
     '// before\n{ "app": { "name": "nestify" } }\n\n// after\n"{\\"app\\":{\\"name\\":\\"nestify\\"}}"',
+  skipReason(summary): string | undefined {
+    return summary.envLines ? 'not JSON' : undefined;
+  },
   run(sourceText: string, context?: ConversionContext): string {
     const { sortKeys } = readSettings(context?.resource);
     const parsed = parseJsonSource(sourceText);

@@ -1,4 +1,5 @@
 import { conversionTarget } from './activeEditor';
+import { envKeyCount } from './envFormat';
 import { countFlatKeys, depthOf } from './jsonNesting';
 import { holdsJsonDocument } from './jsonString';
 import { readSettings } from './settings';
@@ -23,6 +24,11 @@ export interface ActiveJsonSummary {
    * it: a string is a scalar however much JSON it spells.
    */
   readonly jsonString?: boolean;
+  /**
+   * Whether the text reads as `.env` lines. None of the readings above apply to
+   * one, since a `.env` is not JSON at all.
+   */
+  readonly envLines?: boolean;
 }
 
 // Parsing runs on every keystroke in the active file, so skip pathological sizes.
@@ -52,14 +58,26 @@ export function summariseActiveJson(): ActiveJsonSummary {
     return { headerDetail: `${scope} · too large to measure` };
   }
 
-  // Asked before the parse below, not after it. Parse JSON String also takes a
-  // fragment whose surrounding quotes were stripped, which is not valid JSON on
-  // its own, so a header that waited for the parse called the file unconvertible
-  // while the row beneath it converted the thing fine.
+  // Both of these are asked before the parse below, not after it. Neither a
+  // quote-stripped fragment nor a .env is valid JSON on its own, so a header that
+  // waited for the parse called the file unconvertible while the row beneath it
+  // converted the thing fine.
   if (holdsJsonDocument(text)) {
     return {
       headerDetail: hadSelection ? 'Selection: JSON string' : 'JSON string',
-      jsonString: true
+      jsonString: true,
+      envLines: false
+    };
+  }
+
+  const envKeys = envKeyCount(text);
+
+  if (envKeys !== undefined) {
+    const keys = `${envKeys} ${envKeys === 1 ? 'key' : 'keys'}`;
+
+    return {
+      headerDetail: hadSelection ? `Selection: .env · ${keys}` : `.env · ${keys}`,
+      envLines: true
     };
   }
 
@@ -68,13 +86,14 @@ export function summariseActiveJson(): ActiveJsonSummary {
   try {
     parsed = JSON.parse(text.trim());
   } catch {
-    return { problem: `The ${scope} is not valid JSON.`, jsonString: false };
+    return { problem: `The ${scope} is not valid JSON.`, jsonString: false, envLines: false };
   }
 
   if (typeof parsed !== 'object' || parsed === null) {
     return {
       problem: `The ${scope} is a single value, not an object or array.`,
-      jsonString: false
+      jsonString: false,
+      envLines: false
     };
   }
 
@@ -110,7 +129,8 @@ export function summariseActiveJson(): ActiveJsonSummary {
     headerDetail: hadSelection ? `Selection: ${keys} · ${nesting}` : `${keys} · ${nesting}`,
     shape: depth <= 1 ? 'flat' : 'nested',
     joinedKeys: hasJoinedKeys(parsed, separator),
-    jsonString: false
+    jsonString: false,
+    envLines: false
   };
 }
 

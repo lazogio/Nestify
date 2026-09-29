@@ -6,6 +6,8 @@ export interface NestifySettings {
   readonly indent: number;
   readonly arrays: 'rebuild' | 'objects';
   readonly sortKeys: boolean;
+  /** What joins key paths in a `.env`, which is not the JSON separator. */
+  readonly envSeparator: string;
 }
 
 /**
@@ -20,12 +22,15 @@ export function readSettings(resource?: vscode.Uri): NestifySettings {
   const config = vscode.workspace.getConfiguration('nestify', resource);
   const separator = config.get<string>('separator', '.');
   const indent = config.get<number>('indent', 2);
+  const envSeparator = config.get<string>('envSeparator', '__');
 
   return {
     separator: typeof separator === 'string' && separator.length > 0 ? separator : '.',
     indent: Number.isFinite(indent) && indent >= 0 ? Math.floor(indent) : 2,
     arrays: config.get<string>('arrays', 'rebuild') === 'objects' ? 'objects' : 'rebuild',
-    sortKeys: config.get<boolean>('sortKeys', false) === true
+    sortKeys: config.get<boolean>('sortKeys', false) === true,
+    envSeparator:
+      typeof envSeparator === 'string' && envSeparator.length > 0 ? envSeparator : '__'
   };
 }
 

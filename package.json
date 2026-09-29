@@ -61,6 +61,18 @@
         "icon": "$(quote)"
       },
       {
+        "command": "nestify.jsonToEnv",
+        "title": "JSON to .env",
+        "category": "Nestify",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "nestify.envToJson",
+        "title": ".env to JSON",
+        "category": "Nestify",
+        "icon": "$(symbol-namespace)"
+      },
+      {
         "command": "nestify.convert",
         "title": "Convert With…",
         "category": "Nestify",
@@ -119,6 +131,14 @@
         },
         {
           "command": "nestify.stringify",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "nestify.jsonToEnv",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "nestify.envToJson",
           "when": "editorIsOpen"
         },
         {
@@ -223,6 +243,11 @@
           "type": "boolean",
           "default": false,
           "description": "Write the converted JSON with each object's keys in order."
+        },
+        "nestify.envSeparator": {
+          "type": "string",
+          "default": "__",
+          "description": "Separator used to join and split key paths in a .env file. The default \"__\" leaves ordinary snake_case keys alone, and is the convention ASP.NET Core reads nested config with."
         }
       }
     }

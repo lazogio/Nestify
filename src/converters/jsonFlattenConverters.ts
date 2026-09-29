@@ -22,6 +22,10 @@ registerConverter({
   icon: 'list-flat',
   example: '// before\n{ "app": { "name": "nestify" } }\n\n// after\n{ "app.name": "nestify" }',
   skipReason(summary): string | undefined {
+    if (summary.envLines) {
+      return 'not JSON';
+    }
+
     // A document still inside its string is not flat, it is escaped. Reading
     // only the shape left this row looking usable on one, and clicking it threw.
     if (summary.jsonString) {
@@ -59,6 +63,10 @@ registerConverter({
   icon: 'list-tree',
   example: '// before\n{ "app.name": "nestify" }\n\n// after\n{ "app": { "name": "nestify" } }',
   skipReason(summary): string | undefined {
+    if (summary.envLines) {
+      return 'not JSON';
+    }
+
     // As above: there are no keys to read until the string is parsed.
     if (summary.jsonString) {
       return 'still a string';
