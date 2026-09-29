@@ -5,7 +5,8 @@
 </h1>
 
 <p align="center">
-  Turn nested JSON into flat dot-joined keys, and turn it back, without leaving the editor.
+  Flatten nested JSON into dot-joined keys and nest it back — and move it in and out of
+  an escaped string or a <code>.env</code> — without leaving the editor.
 </p>
 
 ```jsonc
@@ -28,10 +29,12 @@ Then pick whichever is closest to hand:
 
 - **Toolbar** — on a `.json` file, two buttons sit top-right of the editor: flatten and nest.
 - **Right-click** — **Nestify** → *Flatten JSON* / *Unflatten (Nest) JSON*.
-- **Command Palette** — `Cmd+Shift+P` / `Ctrl+Shift+P`, then type `Nestify`.
+- **Command Palette** — `Cmd+Shift+P` / `Ctrl+Shift+P`, then type `Nestify`. Every converter
+  has its own entry, and `Nestify: Convert With…` lists them all to pick from.
 - **Sidebar** — the Nestify icon in the Activity Bar lists every converter; click one to run it.
   It states what would be converted — key count and nesting depth of the file or your
-  selection — and a converter that would not help right now says why instead of offering itself.
+  selection, or `JSON string` or `.env · 4 keys` when it is one of those — and a converter
+  that would not help right now says why instead of offering itself.
   Hovering a row reveals a copy button, which puts the result on the clipboard and leaves
   the file alone. `Nestify: Copy Converted…` does the same from the Command Palette.
 
@@ -43,8 +46,8 @@ JSON with comments is not supported: the conversion is written back with
 `JSON.stringify`, which would drop every comment in the file.
 
 No shortcuts are bundled, so nothing of yours is overridden. To add your own, bind
-`nestify.flatten`, `nestify.unflatten`, `nestify.parseString`, or
-`nestify.stringify` in **Keyboard Shortcuts**.
+`nestify.flatten`, `nestify.unflatten`, `nestify.parseString`, `nestify.stringify`,
+`nestify.jsonToEnv`, or `nestify.envToJson` in **Keyboard Shortcuts**.
 
 ## JSON that arrived as a string
 
@@ -149,6 +152,12 @@ character you prefer if you would rather choose it yourself. Keys that clash, co
 an empty segment, or use the reserved name `__proto__` are refused too, in both
 directions, and the message names the key at fault. Whatever flattens can be nested
 back.
+
+A separator of more than one character — `::`, or the `__` a `.env` uses — is refused
+on a second count, because a key can run into it without containing it. Under `__`,
+`{ "user_": { "name": 1 } }` joins to `user___name`, which would split back as `user`
+→ `_name`: a different document. Flattening checks that every key it writes splits
+back into the path that joined to it, so the two directions agree by construction.
 
 Nesting makes the same offer from the other side. A file whose keys are joined with
 something other than your separator — a .NET `appsettings.json`, whose paths use `:`
