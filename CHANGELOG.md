@@ -2,6 +2,39 @@
 
 All notable changes to Nestify are documented in this file.
 
+## [0.0.9] - 2026-09-29
+
+### Added
+
+- `Nestify: JSON to .env` and `Nestify: .env to JSON` move a config between the
+  two shapes, and are true inverses: a document that goes out comes back as it
+  was, arrays included — `{ "tags": ["a"] }` writes `tags__0="a"` and nests back
+  into the array it came from.
+- `nestify.envSeparator`, default `__`, joins key paths in a `.env`. It is
+  separate from `nestify.separator` because the two files want different
+  characters: with `_` a key like `api_key` would be refused as already holding
+  the separator, which is most real configs, and `__` is also the convention
+  ASP.NET Core reads nested config from the environment with.
+- Values are written as JSON, which is what keeps them exact. `.env` itself has
+  no types, so an unquoted `02134` would read back as `2134`; `zip="02134"`
+  stays the string it was. Reading trusts a value's JSON only when rewriting it
+  gives back the very text that was read, so a file no one generated survives
+  too: `ID=1234567890123456789` stays that exact id rather than becoming
+  `1234567890123456800`, and `X=1e5` stays `1e5` rather than `100000`.
+- Reading a `.env` takes the files people actually have: blank lines, `#`
+  comments, an `export` prefix, single-quoted values, and values containing
+  their own `=`, such as a connection string. A key set twice is refused rather
+  than one of the two values being buried.
+- The sidebar reads a `.env` as one, stating `.env · 4 keys`, and the rows that
+  need JSON say `not JSON` instead of offering a conversion that would throw.
+
+### Fixed
+
+- A separator refusal from a `.env` conversion no longer offers to set
+  `nestify.separator`. That button wrote the setting flatten and nest use while
+  leaving the `.env` conversion failing in exactly the same way; the refusal now
+  names `nestify.envSeparator`, which is the one that governs it.
+
 ## [0.0.8] - 2026-09-28
 
 ### Added

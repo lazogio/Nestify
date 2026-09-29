@@ -8,6 +8,7 @@ import { writeSeparator } from './settings';
 
 // Imported for the side effect: the module registers the JSON converters.
 // A new converter module only has to be imported here as well.
+import './converters/envConverters';
 import './converters/jsonFlattenConverters';
 import './converters/jsonStringConverters';
 
@@ -27,6 +28,12 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand('nestify.stringify', () =>
       applyConverter(requireConverter('stringify'))
+    ),
+    vscode.commands.registerCommand('nestify.jsonToEnv', () =>
+      applyConverter(requireConverter('json-to-env'))
+    ),
+    vscode.commands.registerCommand('nestify.envToJson', () =>
+      applyConverter(requireConverter('env-to-json'))
     ),
     vscode.commands.registerCommand('nestify.convert', () => pickAndApplyConverter()),
     // Invoked by the Activity Bar view, which passes the row's converter id.

@@ -74,6 +74,40 @@ would change it: the id `"1234567890123456789"` comes back as
 `1234567890123456800`, and `"1e5"` as `100000`. Those keep their quotes, and the
 refusal says so.
 
+## Config as a `.env`
+
+A `.env` file is one flat key per line, which is the shape flattening already
+produces. **Nestify: JSON to .env** and **Nestify: .env to JSON** move between the
+two, and they are true inverses — what goes out comes back as it was, arrays
+included:
+
+```ini
+# after "Nestify: JSON to .env"
+app__name="nestify"
+app__port=8080
+app__tags__0="a"
+api_key="sk-1"
+zip="02134"
+```
+
+Paths are joined with `__` rather than `_`, which `nestify.envSeparator` changes. A
+single underscore would refuse most real configs, since a key like `api_key` already
+contains it and could no longer be told from a path; `__` leaves those alone, and is
+what ASP.NET Core reads nested config from the environment with.
+
+Values are written as JSON, because `.env` has no types of its own: unquoted, `02134`
+reads back as `2134`, so `zip="02134"` is what keeps it the string it was. Reading
+goes the same way round — a value is only taken as JSON when writing it again gives
+back the very text that was read, so the `.env` you already have survives being
+imported. `ID=1234567890123456789` stays that exact id instead of becoming
+`...800`, and `X=1e5` stays `1e5` rather than `100000`.
+
+Reading also takes what real files contain: blank lines, `#` comments, an `export`
+prefix, single-quoted values, and a value holding its own `=`, like a connection
+string. A key set twice is refused rather than one of its values being quietly
+dropped. Keys are written exactly as the document spells them — they are not
+upper-cased, since `appName` could not be recovered from `APPNAME`.
+
 ## Settings
 
 | Setting             | Default     | What it does                                              |
@@ -82,6 +116,7 @@ refusal says so.
 | `nestify.indent`    | `2`         | Spaces used to indent the JSON written back.              |
 | `nestify.arrays`    | `"rebuild"` | Whether nesting rebuilds arrays from index keys.          |
 | `nestify.sortKeys`  | `false`     | Write each object's keys in order.                        |
+| `nestify.envSeparator` | `"__"`   | Separator that joins key paths in a `.env`.               |
 
 If your keys already contain dots, set `nestify.separator` to `"/"` or `"_"`.
 
