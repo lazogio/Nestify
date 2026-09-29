@@ -40,10 +40,23 @@ describe('toEnvText', () => {
   });
 
   it('refuses a key that could not be read back off one line', () => {
-    assert.match(messageFrom(() => toEnvText({ 'a\nb': 1 })), /more than one line/);
-    assert.match(messageFrom(() => toEnvText({ ' a ': 1 })), /whitespace around it/);
+    assert.match(messageFrom(() => toEnvText({ 'a\nb': 1 })), /contains whitespace/);
+    assert.match(messageFrom(() => toEnvText({ ' a ': 1 })), /contains whitespace/);
     assert.match(messageFrom(() => toEnvText({ '#a': 1 })), /marks a comment/);
     assert.match(messageFrom(() => toEnvText({ '': 1 })), /is empty/);
+  });
+
+  it('refuses the "export a" a sourced file would read back as "a"', () => {
+    assert.match(messageFrom(() => toEnvText({ 'export a': 1 })), /contains whitespace/);
+  });
+
+  it('single-quotes a string a shell would expand, which JSON quotes would not', () => {
+    // pass="a$USER" reaches docker-compose or `source` as "aroot".
+    assert.equal(toEnvText({ pass: 'a$USER' }), "pass='a$USER'");
+    assert.equal(toEnvText({ cmd: 'x`id`' }), "cmd='x`id`'");
+    // Anything needing an escape still needs JSON to carry it.
+    assert.equal(toEnvText({ both: "a$U'b" }), 'both="a$U\'b"');
+    assert.equal(toEnvText({ nl: 'a$U\nb' }), 'nl="a$U\\nb"');
   });
 });
 
@@ -82,6 +95,30 @@ describe('parseEnvText', () => {
 
   it('refuses a key set twice rather than burying the first value', () => {
     assert.match(messageFrom(() => parseEnvText('A=1\nA=2')), /set twice/);
+  });
+
+  it('strips an inline comment from an unquoted value, as dotenv does', () => {
+    assert.deepEqual(parseEnvText('PORT=8080 # the port'), { PORT: 8080 });
+    // Inside quotes a "#" is part of the value, which is every value Nestify writes.
+    assert.deepEqual(parseEnvText('A="a # b"'), { A: 'a # b' });
+    assert.deepEqual(parseEnvText('URL=http://h/p#frag'), { URL: 'http://h/p#frag' });
+  });
+
+  it('refuses a line whose name holds whitespace, so code is not read as .env', () => {
+    assert.match(messageFrom(() => parseEnvText('const a = 1')), /contains whitespace/);
+  });
+
+  it('points at the line it refused, so a selection lands on the right one', () => {
+    const text = 'A=1\nB=2\njust words';
+    let offset: unknown;
+
+    try {
+      parseEnvText(text);
+    } catch (error) {
+      offset = (error as { offset?: number }).offset;
+    }
+
+    assert.equal(offset, text.indexOf('just words'));
   });
 
   it('refuses a line that sets nothing, and text that sets nothing at all', () => {

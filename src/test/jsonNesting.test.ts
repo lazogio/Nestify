@@ -130,6 +130,31 @@ describe('flattenJson', () => {
     });
   });
 
+  describe('one path that runs into a multi-character separator', () => {
+    it('refuses a key that would split back into a different path', () => {
+      // No collision and no segment holding the separator, and still not nestable:
+      // ["user_", "name"] joins to "user___name", which splits as ["user", "_name"].
+      // Under "::" the same shape quietly reshaped a key ending in ":".
+      const message = messageFrom(() => flattenJson({ user_: { name: 'x' } }, { separator: '__' }));
+
+      assert.match(message, /"user___name" cannot be nested back/);
+      assert.match(message, /"user" → "_name" instead/);
+    });
+
+    it('lets a document that does split back through', () => {
+      assert.deepEqual(flattenJson({ api_key: { v: 1 } }, { separator: '__' }), {
+        api_key__v: 1
+      });
+    });
+
+    it('round-trips whatever it allows', () => {
+      const document = { api_key: { v: 1 }, a_: 2, tags: ['x'] };
+      const flat = flattenJson(document, { separator: '__' });
+
+      assert.deepEqual(unflattenJson(flat, { separator: '__' }), document);
+    });
+  });
+
   describe('keys that could not be nested back', () => {
     it('refuses a "__proto__" key instead of stranding it in flat form', () => {
       // JSON.parse is how the extension gets here, and it makes "__proto__" an

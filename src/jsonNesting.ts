@@ -152,6 +152,12 @@ function collectLeaves(input: unknown, options: NestingOptions): Flattening['lea
 
   walk(input, [], into);
 
+  // Only a separator of more than one character can be split across two segments
+  // that neither of them contains, so the ordinary "." costs nothing here.
+  if (separator.length > 1) {
+    rejectKeysThatSplitBackDifferently(into.leaves, separator);
+  }
+
   return into.leaves;
 }
 
@@ -339,6 +345,39 @@ function rejectWhatCannotBeNestedBack(path: string[], flatKey: string, separator
   if (path.some((segment) => segment.length === 0)) {
     throw new SyntaxError(
       `Nestify: the key "${flatKey}" cannot be nested back — one of its segments is empty.`
+    );
+  }
+
+}
+
+/**
+ * Refuses a key that splits back into a different path than the one that joined to
+ * it.
+ *
+ * Holding the separator is not the only way a path stops being nestable once the
+ * separator is longer than one character: a segment can end where the next
+ * separator begins. `["user_", "name"]` contains no `__` and still joins to
+ * `user___name`, which splits back as `["user", "_name"]` — a quietly different
+ * document, and the same reason a separator of `::` reshaped a key ending in `:`.
+ *
+ * Run over the finished map rather than per key, so two paths colliding are still
+ * reported as the collision they are, which names both sides.
+ */
+function rejectKeysThatSplitBackDifferently(
+  leaves: Flattening['leaves'],
+  separator: string
+): void {
+  for (const [flatKey, leaf] of leaves) {
+    const split = flatKey.split(separator);
+
+    if (split.length === leaf.path.length && split.every((s, at) => s === leaf.path[at])) {
+      continue;
+    }
+
+    throw new SyntaxError(
+      `Nestify: the key "${flatKey}" cannot be nested back — ${describePath(leaf.path)} joins ` +
+        `to it, but splitting it on "${separator}" gives ${describePath(split)} instead. ` +
+        'Set the separator to one your keys do not run into.'
     );
   }
 }

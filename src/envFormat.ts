@@ -9,6 +9,7 @@
  * can be tested on their own.
  */
 
+import { ConversionError } from './converters/jsonSource';
 import type { FlatJson } from './jsonNesting';
 
 /**
@@ -27,7 +28,28 @@ export function toEnvText(flat: FlatJson): string {
     throw new Error('There is nothing to write — the document sets no keys.');
   }
 
-  return entries.map(([key, value]) => `${checkedKey(key)}=${JSON.stringify(value)}`).join('\n');
+  return entries.map(([key, value]) => `${checkedKey(key)}=${encodeValue(value)}`).join('\n');
+}
+
+/**
+ * The text a value is written as.
+ *
+ * JSON, except for a string a shell would rewrite. Double quotes are the one form
+ * `source` and docker-compose expand, so `pass="a$USER"` reaches the tool the file
+ * was generated for as `aroot` — corruption that Nestify's own reader cannot see,
+ * because it round-trips the text perfectly. Single quotes expand nothing, and
+ * `decodeValue` already reads them, so such a value goes out in those instead.
+ */
+function encodeValue(value: unknown): string {
+  const literal = JSON.stringify(value);
+
+  // Only a plain string can move: anything needing an escape needs JSON to carry
+  // it, since a single-quoted value has no escaping at all.
+  if (typeof value === 'string' && /[$`]/.test(value) && !/['\\\n\r\t\u0000-\u001f]/.test(value)) {
+    return `'${value}'`;
+  }
+
+  return literal;
 }
 
 /**
@@ -39,9 +61,18 @@ export function toEnvText(flat: FlatJson): string {
  */
 export function parseEnvText(text: string): FlatJson {
   const entries = new Map<string, unknown>();
-  const lines = text.split(/\r?\n/);
 
-  for (const [index, line] of lines.entries()) {
+  // Walked rather than split, so every refusal can carry the offset of the line it
+  // is about. A line number alone would count from the start of the converted
+  // text, which is the wrong number whenever a selection is being converted.
+  for (let at = 0; at <= text.length; ) {
+    const breaks = text.indexOf('\n', at);
+    const ends = breaks === -1 ? text.length : breaks;
+    const line = text.slice(at, ends).replace(/\r$/, '');
+    const lineAt = at;
+
+    at = breaks === -1 ? text.length + 1 : breaks + 1;
+
     const statement = line.trim();
 
     if (statement.length === 0 || statement.startsWith('#')) {
@@ -50,29 +81,41 @@ export function parseEnvText(text: string): FlatJson {
 
     // The first "=" only. A value may hold more of them, as a connection string
     // or a base64 padding does.
-    const at = statement.indexOf('=');
+    const splits = statement.indexOf('=');
 
-    if (at === -1) {
-      throw new Error(
-        `Line ${index + 1} sets no value: ${JSON.stringify(statement)}. Every line a ` +
-          '.env carries is either a "key=value", a "#" comment, or blank.'
+    if (splits === -1) {
+      throw new ConversionError(
+        `This line sets no value: ${JSON.stringify(statement)}. Every line a .env ` +
+          'carries is either a "key=value", a "#" comment, or blank.',
+        lineAt
       );
     }
 
-    const key = statement.slice(0, at).replace(/^export\s+/, '').trim();
+    const key = statement.slice(0, splits).replace(/^export\s+/, '').trim();
 
     if (key.length === 0) {
-      throw new Error(`Line ${index + 1} has nothing before its "=", so it names no key.`);
+      throw new ConversionError('This line has nothing before its "=", so it names no key.', lineAt);
+    }
+
+    // Whitespace inside a name is what tells a .env apart from ordinary code: an
+    // environment cannot hold "const a", so a `const a = 1` was never a .env line.
+    if (/\s/.test(key)) {
+      throw new ConversionError(
+        `This line sets "${key}", which contains whitespace, so it is not the name of an ` +
+          'environment variable.',
+        lineAt
+      );
     }
 
     if (entries.has(key)) {
-      throw new Error(
-        `The key "${key}" is set twice, the second time on line ${index + 1}. Nesting ` +
-          'would keep only one of the two values, so nothing is converted.'
+      throw new ConversionError(
+        `The key "${key}" is set twice. Nesting would keep only one of the two values, so ` +
+          'nothing is converted.',
+        lineAt
       );
     }
 
-    entries.set(key, decodeValue(statement.slice(at + 1).trim()));
+    entries.set(key, decodeValue(statement.slice(splits + 1).trim()));
   }
 
   if (entries.size === 0) {
@@ -117,14 +160,19 @@ export function envKeyCount(text: string): number | undefined {
  * `"1e5"` rather than becoming `100000`. Whatever `toEnvText` wrote is exactly
  * what `JSON.stringify` produced, so it always survives the check.
  */
-function decodeValue(raw: string): unknown {
-  if (raw.length === 0) {
-    return '';
+function decodeValue(value: string): unknown {
+  // Not JSON, and a shell reads single quotes as "nothing in here is escaped".
+  if (value.length >= 2 && value.startsWith("'") && value.endsWith("'")) {
+    return value.slice(1, -1);
   }
 
-  // Not JSON, and a shell reads single quotes as "nothing in here is escaped".
-  if (raw.length >= 2 && raw.startsWith("'") && raw.endsWith("'")) {
-    return raw.slice(1, -1);
+  // An inline comment ends an unquoted value, the way dotenv reads one. Inside
+  // quotes a "#" is part of the value, so a quoted value is left whole — which is
+  // every value Nestify itself writes.
+  const raw = value.startsWith('"') ? value : value.replace(/\s+#.*$/, '').trimEnd();
+
+  if (raw.length === 0) {
+    return '';
   }
 
   try {
@@ -155,18 +203,16 @@ function checkedKey(key: string): string {
     );
   }
 
-  if (/[\r\n]/.test(key)) {
+  // Any whitespace, not just a line break or a surrounding space: an environment
+  // holds no name containing one, and reading the line back would not give it
+  // again.
+  if (/\s/.test(key)) {
     throw new Error(
-      `The key "${key}" spans more than one line, and a .env sets one key per line.`
+      `The key "${key}" contains whitespace, so it is not the name of an environment ` +
+        'variable and could not be read back.'
     );
   }
 
-  if (key !== key.trim()) {
-    throw new Error(
-      `The key "${key}" has whitespace around it, which reading the line back would ` +
-        'strip, so it would come back as a different key.'
-    );
-  }
 
   if (key.startsWith('#')) {
     throw new Error(

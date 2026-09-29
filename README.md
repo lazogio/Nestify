@@ -102,11 +102,18 @@ back the very text that was read, so the `.env` you already have survives being
 imported. `ID=1234567890123456789` stays that exact id instead of becoming
 `...800`, and `X=1e5` stays `1e5` rather than `100000`.
 
-Reading also takes what real files contain: blank lines, `#` comments, an `export`
-prefix, single-quoted values, and a value holding its own `=`, like a connection
-string. A key set twice is refused rather than one of its values being quietly
-dropped. Keys are written exactly as the document spells them — they are not
-upper-cased, since `appName` could not be recovered from `APPNAME`.
+Reading also takes what real files contain: blank lines, whole-line and inline `#`
+comments, an `export` prefix, single-quoted values, and a value holding its own `=`,
+like a connection string. A `#` inside quotes stays part of the value. A key set
+twice is refused rather than one of its values being quietly dropped, and a refusal
+puts the cursor on the line it is about.
+
+A string a shell would rewrite goes out in single quotes rather than JSON ones,
+since double quotes are the one form `source` and docker-compose expand —
+`pass="a$USER"` would otherwise reach them as `aroot`. Keys are written exactly as
+the document spells them: not upper-cased, since `appName` could not be recovered
+from `APPNAME`, and never containing whitespace, which no environment variable name
+can.
 
 ## Settings
 
