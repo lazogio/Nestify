@@ -13,3 +13,5 @@ package-lock.json
 .claude/**
 CONTRIBUTING.md
 CLAUDE.md
+images/demo.gif
+images/demo.mp4
