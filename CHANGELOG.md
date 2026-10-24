@@ -6,8 +6,8 @@ All notable changes to Nestify are documented in this file.
 
 ### Changed
 
-- The README, and so the Marketplace page, opens with a short demo of flattening
-  a nested JSON file. No change to the extension itself.
+- The README, and so the Marketplace page, opens with an MIT license badge and a
+  short demo of flattening a nested JSON file. No change to the extension itself.
 
 ## [0.0.9] - 2026-09-29
 

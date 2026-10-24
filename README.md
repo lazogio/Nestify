@@ -10,6 +10,10 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/lazogio/Nestify/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/lazogio/Nestify/blob/main/images/demo.mp4">
     <img src="https://raw.githubusercontent.com/lazogio/Nestify/main/images/demo.gif" width="420" alt="Nestify demo: flattening nested JSON into dot-path keys in VS Code">
   </a>
